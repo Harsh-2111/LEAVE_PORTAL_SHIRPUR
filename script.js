@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
     formData.append('login_id', loginId);
     formData.append('password', password);
     try {
-      const response = await fetch('login.php', { method: 'POST', body: formData });
+      const response = await fetch('/api/index.php?endpoint=login.php', { method: 'POST', body: formData });
       const result = await response.json();
       if (!result.success) {
         showMessage(loginMessage, result.message || 'Login failed.', 'error');
@@ -99,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function logoutUser() {
     try {
-      await fetch('logout.php', { method: 'POST', body: getCsrfFormData() });
+      await fetch('/api/index.php?endpoint=logout.php', { method: 'POST', body: getCsrfFormData() });
     } catch (error) {
       console.error(error);
     }
@@ -198,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let expectedSchool = '';
     try {
-      const response = await fetch(`student_lookup.php?sap_id=${encodeURIComponent(state.user.login_id)}`);
+      const response = await fetch(`/api/index.php?endpoint=student_lookup.php&sap_id=${encodeURIComponent(state.user.login_id)}`);
       const result = await response.json();
       if (!result.success) throw new Error(result.message || 'Student profile unavailable.');
       const profile = result.student;
@@ -276,7 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
         details_confirmed: document.getElementById('student-details-confirmed').checked ? '1' : '0'
       });
       try {
-        const response = await fetch('submit_student_leave.php', { method: 'POST', body: requestData });
+        const response = await fetch('/api/index.php?endpoint=submit_student_leave.php', { method: 'POST', body: requestData });
         const result = await response.json();
         message.textContent = result.message || (result.success ? 'Request submitted.' : 'Unable to submit request.');
         message.className = `text-sm ${result.success ? 'text-green-700' : 'text-red-600'}`;
@@ -301,7 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const target = document.getElementById('student-history-table');
     if (!target) return;
     try {
-      const response = await fetch('my_leaves.php');
+      const response = await fetch('/api/index.php?endpoint=my_leaves.php');
       const result = await response.json();
       const items = result.items || [];
       if (!items.length) {
@@ -404,7 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const target = document.getElementById('warden-pending-list');
     if (!target) return;
     try {
-      const response = await fetch('list_leaves.php?status=Pending%20Verification&limit=20');
+      const response = await fetch('/api/index.php?endpoint=list_leaves.php&status=Pending%20Verification&limit=20');
       const result = await response.json();
       const items = result.items || [];
       if (!items.length) {
@@ -438,7 +438,7 @@ document.addEventListener('DOMContentLoaded', () => {
             remarks: target.querySelector(`[data-remarks="${leaveId}"]`)?.value || ''
           });
           try {
-            const response = await fetch('record_call.php', { method: 'POST', body: data });
+            const response = await fetch('/api/index.php?endpoint=record_call.php', { method: 'POST', body: data });
             const result = await response.json();
             if (!result.success) window.alert(result.message || 'Call result update failed.');
             await refreshPendingRequests();
@@ -486,7 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (sapId) params.set('sap_id', sapId);
       if (token) params.set('token', token);
       try {
-        const response = await fetch(`verify_pass.php?${params.toString()}`);
+        const response = await fetch(`/api/index.php?endpoint=verify_pass.php&${params.toString()}`);
         const result = await response.json();
         if (!result.success) showMessage(document.getElementById('security-result'), result.message || 'Pass verification failed.', 'error');
         else showMessage(document.getElementById('security-result'), `Verified: ${result.student_name} | Status: ${result.status} | Valid QR: ${result.valid_qr ? 'Yes' : 'No'}`, 'success');
@@ -523,7 +523,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const formData = new FormData(event.currentTarget);
       formData.append('csrf_token', state.csrfToken);
       try {
-        const response = await fetch('import_students.php', { method: 'POST', body: formData });
+        const response = await fetch('/api/index.php?endpoint=import_students.php', { method: 'POST', body: formData });
         const result = await response.json();
         showMessage(document.getElementById('admin-import-result'), result.message || 'Import complete.', result.success ? 'success' : 'error');
       } catch (error) {

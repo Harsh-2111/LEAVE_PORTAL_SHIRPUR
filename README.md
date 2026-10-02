@@ -47,7 +47,7 @@ The database is created automatically from the schema file in the project root a
 
 ## Vercel deployment
 
-Vercel needs the included `vercel.json` to execute PHP through the `vercel-php` community runtime. PHP files are built as functions rather than published as source files. The PHP runtime supports PDO MySQL, and PHP sessions are stored in the database so they work across separate function invocations.
+Vercel needs the included `vercel.json` to execute PHP through the `vercel-php` community runtime. All API requests are routed through one `api/index.php` function to avoid a function-per-PHP-file deployment and to prevent PHP source files from being published as static files. The PHP runtime supports PDO MySQL, and PHP sessions are stored in the database so they work across separate function invocations.
 
 Vercel cannot reach the `db` hostname from `docker-compose.yml`; that name only exists inside the local Compose network. Create an externally reachable MySQL database, initialize it with `hostel_leave_schema_v2.sql`, `dev_seed.sql`, and `hostel_leave_migration_v3.sql`, then add these variables in Vercel Project Settings under Environment Variables:
 
