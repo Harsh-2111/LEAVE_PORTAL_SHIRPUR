@@ -13,12 +13,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const changePasswordModal = document.getElementById('change-password-modal');
   const state = { csrfToken: '', user: null };
   let loginProgressTimer = null;
+  let securityQrScanner = null;
+  let handlingSecurityScan = false;
 
   function openChangePasswordModal() {
     if (!changePasswordModal) return;
     const form = document.getElementById('change-password-form');
     const message = document.getElementById('change-password-message');
     if (form) form.reset();
+    resetChangePasswordVisibility();
     if (message) hideMessage(message);
     changePasswordModal.classList.remove('hidden');
   }
@@ -28,8 +31,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('change-password-form');
     const message = document.getElementById('change-password-message');
     if (form) form.reset();
+    resetChangePasswordVisibility();
     if (message) hideMessage(message);
     changePasswordModal.classList.add('hidden');
+  }
+
+  function resetChangePasswordVisibility() {
+    document.querySelectorAll('#change-password-form [data-password-toggle]').forEach(button => {
+      const input = document.getElementById(button.dataset.passwordToggle);
+      if (!input) return;
+      input.type = 'password';
+      const label = `Show ${button.dataset.passwordLabel}`;
+      button.setAttribute('aria-label', label);
+      button.title = label;
+    });
   }
 
   function showMessage(element, message, type) {
@@ -163,6 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function logoutUser() {
+    await stopSecurityScanner();
     try {
       await fetch('/api/index.php?endpoint=logout.php', { method: 'POST', body: getCsrfFormData() });
     } catch (error) {
@@ -410,9 +426,15 @@ document.addEventListener('DOMContentLoaded', () => {
           confirm_password: confirmPassword
         })
       });
-      const result = await response.json();
-      if (!result.success) {
-        showMessage(message, result.message || 'Password change failed.', 'error');
+      const responseText = await response.text();
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch {
+        throw new Error(`Password service returned an invalid response (HTTP ${response.status}).`);
+      }
+      if (!response.ok || !result.success) {
+        showMessage(message, result.message || `Password update failed (HTTP ${response.status}).`, 'error');
         return;
       }
 
@@ -420,7 +442,7 @@ document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => closeChangePasswordModal(), 1200);
     } catch (error) {
       console.error(error);
-      showMessage(message, 'Password update failed. Please try again.', 'error');
+      showMessage(message, error.message || 'Password update failed. Please try again.', 'error');
     }
   }
 
@@ -476,93 +498,118 @@ document.addEventListener('DOMContentLoaded', () => {
     target.innerHTML = `
       <p class="text-green-800 font-semibold">Pass token: ${pass.pass_token || 'Not available'}</p>
       <p class="text-sm text-gray-700 mb-4">Valid ${pass.start_date} to ${pass.end_date}</p>
-      <div class="flex justify-center mb-4"><div class="p-4 bg-white rounded shadow-md"><div id="gate-pass-qr" role="img" aria-label="Gate pass QR code"></div></div></div>
+      <div class="flex justify-center mb-4"><div class="p-10 bg-white rounded shadow-md"><div id="gate-pass-qr" role="img" aria-label="Gate pass QR code"></div></div></div>
       <div class="flex flex-wrap gap-3">
         <button type="button" id="download-gate-pass-qr" class="bg-blue-600 text-white px-4 py-2 rounded">Download QR</button>
         <button type="button" id="download-student-pdf" class="bg-purple-600 text-white px-4 py-2 rounded">Download PDF</button>
       </div>
+      <p id="gate-pass-download-message" class="mt-3 text-sm" aria-live="polite"></p>
     `;
     const qrContainer = document.getElementById('gate-pass-qr');
     if (typeof window.QRCode === 'function') {
-      new window.QRCode(qrContainer, { text: pass.qr_code_data, width: 200, height: 200, correctLevel: window.QRCode.CorrectLevel.M });
+      const qrPayload = pass.pass_token ? `HLP1:${pass.pass_token}` : pass.qr_code_data;
+      new window.QRCode(qrContainer, { text: qrPayload, width: 320, height: 320, correctLevel: window.QRCode.CorrectLevel.H });
     } else {
       qrContainer.textContent = 'QR generator unavailable. Use the pass token at the gate.';
     }
+
+    function createQuietZoneQr(sourceCanvas) {
+      const quietZone = 40;
+      const output = document.createElement('canvas');
+      output.width = sourceCanvas.width + quietZone * 2;
+      output.height = sourceCanvas.height + quietZone * 2;
+      const context = output.getContext('2d');
+      if (!context) throw new Error('Unable to prepare the QR image.');
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, output.width, output.height);
+      context.imageSmoothingEnabled = false;
+      context.drawImage(sourceCanvas, quietZone, quietZone);
+      return output;
+    }
+
     document.getElementById('download-gate-pass-qr').addEventListener('click', () => {
       const canvas = qrContainer.querySelector('canvas');
-      if (!canvas) return;
-      const link = document.createElement('a');
-      link.href = canvas.toDataURL('image/png');
-      link.download = `gate-pass-${pass.sap_id}.png`;
-      link.click();
+      const message = document.getElementById('gate-pass-download-message');
+      try {
+        if (!canvas) throw new Error('The QR code is not ready yet. Refresh and try again.');
+        const link = document.createElement('a');
+        link.href = createQuietZoneQr(canvas).toDataURL('image/png');
+        link.download = `gate-pass-${pass.sap_id}.png`;
+        link.click();
+        message.textContent = 'QR code downloaded.';
+        message.className = 'mt-3 text-sm text-green-700';
+      } catch (error) {
+        console.error(error);
+        message.textContent = error.message || 'QR download failed.';
+        message.className = 'mt-3 text-sm text-red-600';
+      }
     });
     document.getElementById('download-student-pdf').addEventListener('click', () => {
-      if (!window.jspdf?.jsPDF) return;
-      const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 14;
-      const studentName = state.user?.name || 'Student';
+      const message = document.getElementById('gate-pass-download-message');
+      try {
+        if (!window.jspdf?.jsPDF) throw new Error('PDF support did not load. Refresh the page and try again.');
+        const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const margin = 14;
+        const qrCanvas = qrContainer.querySelector('canvas');
+        const studentName = document.getElementById('student-profile-name')?.value || state.user?.name || 'Student';
+        const parentEmail = document.getElementById('student-profile-parent-email')?.value || 'Not provided';
+        const parentContact = document.getElementById('student-profile-parent-contact')?.value || 'Not provided';
 
-      pdf.setFillColor(248, 250, 252);
-      pdf.rect(10, 10, pageWidth - 20, pageHeight - 20, 'F');
-      pdf.setDrawColor(30, 64, 175);
-      pdf.roundedRect(10, 10, pageWidth - 20, pageHeight - 20, 4, 4, 'S');
+        pdf.setFillColor(248, 250, 252);
+        pdf.rect(10, 10, pageWidth - 20, 277, 'F');
+        pdf.setDrawColor(30, 64, 175);
+        pdf.roundedRect(10, 10, pageWidth - 20, 277, 4, 4, 'S');
+        pdf.setTextColor(17, 24, 39);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(20);
+        pdf.text('NMIMS Leave - Gate Pass', margin, 25);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10);
+        pdf.text('Approved leave pass. Present this pass to hostel security.', margin, 32);
+        pdf.setDrawColor(148, 163, 184);
+        pdf.line(margin, 38, pageWidth - margin, 38);
 
-      pdf.setTextColor(17, 24, 39);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(20);
-      pdf.text('NMIMS Leave - Gate Pass', margin, 24);
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text('This is your official digital gate pass.', margin, 31);
+        pdf.setTextColor(31, 41, 55);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(12);
+        pdf.text(`Student: ${studentName}`, margin, 52);
+        pdf.text(`SAP ID: ${pass.sap_id}`, margin, 62);
+        pdf.text(`School: ${pass.school || 'N/A'}`, margin, 72);
+        pdf.text(`Hostel: ${pass.hostel || 'N/A'}`, margin, 82);
+        pdf.text(`Leave: ${pass.start_date} to ${pass.end_date}`, margin, 96);
+        pdf.text(`Duration: ${pass.leave_days || 1} day(s)`, margin, 106);
+        pdf.text(`Pass token: ${pass.pass_token || 'N/A'}`, margin, 116);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text('Reason:', margin, 130);
+        const reasonLines = pdf.splitTextToSize(pass.reason || 'Not specified', 112).slice(0, 5);
+        pdf.text(reasonLines, margin, 137);
 
-      pdf.setDrawColor(148, 163, 184);
-      pdf.line(margin, 36, pageWidth - margin, 36);
+        if (qrCanvas) {
+          pdf.addImage(createQuietZoneQr(qrCanvas).toDataURL('image/png'), 'PNG', pageWidth - margin - 48, 48, 48, 48);
+          pdf.setFontSize(9);
+          pdf.text('Scan at security', pageWidth - margin - 24, 101, { align: 'center' });
+        }
 
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(31, 41, 55);
-      pdf.setFontSize(12);
-      pdf.text(`Student Name: ${studentName}`, margin, 48);
-      pdf.text(`Student ID: ${pass.sap_id}`, margin, 56);
-      pdf.text(`Branch: ${pass.school || 'N/A'}`, margin, 64);
-      pdf.text(`Batch: ${pass.hostel || 'N/A'}`, margin, 72);
-      pdf.text(`Leave From: ${pass.start_date}`, margin, 84);
-      pdf.text(`Leave Till: ${pass.end_date}`, margin, 92);
-      pdf.text(`Leave Days: ${pass.leave_days || 1}`, margin, 100);
-      pdf.text(`Reason: ${pass.reason || 'Not specified'}`, margin, 112, { maxWidth: pageWidth - (margin * 2) - 40 });
-      pdf.text(`Attendance: 85.00%`, margin, 128);
-
-      pdf.setTextColor(16, 185, 129);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(18);
-      pdf.text('Approval Status:', margin, 146);
-      pdf.setTextColor(37, 99, 235);
-      pdf.setFontSize(11);
-      pdf.text(`Teacher: ${state.user?.name || 'Approved'}`, margin, 156);
-      pdf.text(`HOD: Approved`, margin, 164);
-      pdf.text(`Dean: Approved`, margin, 172);
-
-      pdf.setTextColor(17, 24, 39);
-      pdf.setFontSize(11);
-      pdf.text('Parent Contact Details:', margin, 190);
-      pdf.text(`Email: ${state.user?.email || 'parent@example.com'}`, margin, 198);
-      pdf.text(`Contact No: ${state.user?.phone || '9876543210'}`, margin, 206);
-
-      pdf.setTextColor(200, 30, 30);
-      pdf.saveGraphicsState();
-      pdf.translate(150, 120);
-      pdf.rotate(-35);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(26);
-      pdf.text('APPROVED', 0, 0);
-      pdf.restoreGraphicsState();
-
-      pdf.setTextColor(17, 24, 39);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9);
-      pdf.text(`Generated on: ${new Date().toLocaleString()}`, margin, pageHeight - 18);
-      pdf.save(`gate-pass-${pass.sap_id}.pdf`);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(11);
+        pdf.text('Parent contact', margin, 184);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10);
+        pdf.text(`Email: ${parentEmail}`, margin, 192);
+        pdf.text(`Phone: ${parentContact}`, margin, 200);
+        pdf.setDrawColor(148, 163, 184);
+        pdf.line(margin, 270, pageWidth - margin, 270);
+        pdf.setFontSize(9);
+        pdf.text(`Generated: ${new Date().toLocaleString()}`, margin, 278);
+        pdf.save(`gate-pass-${pass.sap_id}.pdf`);
+        message.textContent = 'Gate pass PDF downloaded.';
+        message.className = 'mt-3 text-sm text-green-700';
+      } catch (error) {
+        console.error(error);
+        message.textContent = error.message || 'PDF download failed.';
+        message.className = 'mt-3 text-sm text-red-600';
+      }
     });
   }
 
@@ -640,6 +687,148 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function extractPassToken(decodedValue) {
+    const value = String(decodedValue || '').trim();
+    const compactMatch = value.match(/^HLP1:([a-f\d]{32})$/i);
+    if (compactMatch) return compactMatch[1];
+    const passIdMatch = value.match(/^Pass ID:\s*([a-f\d]{32})\s*$/im);
+    if (passIdMatch) return passIdMatch[1];
+    const tokenMatch = value.match(/^([a-f\d]{32})$/i);
+    if (tokenMatch) return tokenMatch[1];
+    try {
+      const parsedUrl = new URL(value);
+      return parsedUrl.searchParams.get('token') || parsedUrl.searchParams.get('pass_token') || '';
+    } catch {
+      return '';
+    }
+  }
+
+  function renderSecurityResult(result) {
+    const target = document.getElementById('security-result');
+    if (!target) return;
+    const card = document.createElement('section');
+    card.className = `mt-4 rounded-lg border-2 p-5 ${result.valid_qr ? 'border-green-500 bg-green-50' : 'border-amber-500 bg-amber-50'}`;
+
+    const heading = document.createElement('h3');
+    heading.className = 'text-2xl font-bold text-gray-900';
+    heading.textContent = result.student_name || 'Student pass';
+    card.appendChild(heading);
+
+    const badge = document.createElement('p');
+    badge.className = `mt-2 inline-flex rounded px-3 py-1 text-lg font-bold ${result.valid_qr ? 'bg-green-700 text-white' : 'bg-amber-600 text-white'}`;
+    badge.textContent = result.valid_qr ? 'PASS VERIFIED' : 'PASS FOUND - QR SIGNATURE UNVERIFIED';
+    card.appendChild(badge);
+
+    const details = document.createElement('dl');
+    details.className = 'mt-4 grid gap-3 sm:grid-cols-2';
+    [
+      ['SAP ID', result.sap_id],
+      ['Status', result.status],
+      ['Valid from', result.start_date],
+      ['Valid until', result.end_date],
+      ['Pass token', result.pass_token],
+      ['Reason', result.reason]
+    ].forEach(([label, value]) => {
+      const row = document.createElement('div');
+      row.className = 'rounded border border-gray-200 bg-white p-3';
+      const term = document.createElement('dt');
+      term.className = 'text-xs font-semibold uppercase text-gray-500';
+      term.textContent = label;
+      const description = document.createElement('dd');
+      description.className = 'mt-1 break-words text-base font-semibold text-gray-900';
+      description.textContent = value || 'Not provided';
+      row.append(term, description);
+      details.appendChild(row);
+    });
+    card.appendChild(details);
+    target.replaceChildren(card);
+    target.classList.remove('hidden');
+  }
+
+  async function verifySecurityPass({ sapId = '', token = '' } = {}) {
+    const target = document.getElementById('security-result');
+    const params = new URLSearchParams();
+    if (sapId) params.set('sap_id', sapId);
+    if (token) params.set('token', token);
+    showMessage(target, 'Checking pass...', 'info');
+    try {
+      const response = await fetch(`/api/index.php?endpoint=verify_pass.php&${params.toString()}`);
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        showMessage(target, result.message || 'Pass verification failed.', 'error');
+        return;
+      }
+      renderSecurityResult(result);
+    } catch (error) {
+      console.error(error);
+      showMessage(target, 'Verification request failed. Check the network and try again.', 'error');
+    }
+  }
+
+  async function stopSecurityScanner() {
+    const scanner = securityQrScanner;
+    securityQrScanner = null;
+    if (!scanner) return;
+    try {
+      if (scanner.isScanning) await scanner.stop();
+      scanner.clear();
+    } catch (error) {
+      console.warn('Unable to stop QR scanner cleanly.', error);
+    }
+  }
+
+  async function startSecurityScanner() {
+    const reader = document.getElementById('security-qr-reader');
+    const result = document.getElementById('security-result');
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      showMessage(result, 'Camera scanning requires HTTPS and camera permission. Open the secure site on your device.', 'error');
+      return;
+    }
+    if (typeof window.Html5Qrcode !== 'function') {
+      showMessage(result, 'QR scanner did not load. Refresh the page and try again.', 'error');
+      return;
+    }
+
+    await stopSecurityScanner();
+    reader.classList.remove('hidden');
+    const scanner = new window.Html5Qrcode('security-qr-reader');
+    securityQrScanner = scanner;
+    const scanButton = document.getElementById('security-scan-button');
+    const stopButton = document.getElementById('security-stop-scan-button');
+    scanButton.disabled = true;
+    stopButton.classList.remove('hidden');
+
+    try {
+      const boxSize = Math.min(280, Math.max(180, Math.floor(reader.clientWidth * 0.8)));
+      await scanner.start(
+        { facingMode: 'environment' },
+        { fps: 12, qrbox: { width: boxSize, height: boxSize }, aspectRatio: 1 },
+        async decodedText => {
+          if (handlingSecurityScan) return;
+          handlingSecurityScan = true;
+          const token = extractPassToken(decodedText);
+          await stopSecurityScanner();
+          reader.classList.add('hidden');
+          stopButton.classList.add('hidden');
+          scanButton.disabled = false;
+          if (!token) {
+            showMessage(result, 'This QR code does not contain a recognized hostel pass token.', 'error');
+          } else {
+            await verifySecurityPass({ token });
+          }
+          handlingSecurityScan = false;
+        }
+      );
+    } catch (error) {
+      console.error(error);
+      await stopSecurityScanner();
+      reader.classList.add('hidden');
+      stopButton.classList.add('hidden');
+      scanButton.disabled = false;
+      showMessage(result, 'Could not open the camera. Allow camera access in your browser and try again.', 'error');
+    }
+  }
+
   function showSecurityPage() {
     hideAllPages();
     appContainer.classList.add('portal-wide');
@@ -653,33 +842,34 @@ document.addEventListener('DOMContentLoaded', () => {
         <section class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
           <h2 class="text-2xl font-semibold text-gray-700 mb-4">Verify Gate Pass</h2>
           <div class="grid md:grid-cols-2 gap-4">
-            <label class="block text-sm font-medium text-gray-700">Student SAP ID<input id="security-sap-id" type="text" class="mt-2 w-full p-3 border border-gray-300 rounded-lg" placeholder="11-digit SAP ID" /></label>
-            <label class="block text-sm font-medium text-gray-700">Pass token<input id="security-pass-token" type="text" class="mt-2 w-full p-3 border border-gray-300 rounded-lg" placeholder="Optional pass token" /></label>
+            <label class="block text-sm font-medium text-gray-700">Student SAP ID<input id="security-sap-id" type="text" inputmode="numeric" class="mt-2 w-full p-3 border border-gray-300 rounded-lg" placeholder="Enter SAP ID" /></label>
+            <label class="block text-sm font-medium text-gray-700">Pass token<input id="security-pass-token" type="text" class="mt-2 w-full p-3 border border-gray-300 rounded-lg" placeholder="Enter pass token" /></label>
           </div>
-          <button id="verify-pass-btn" type="button" class="mt-5 bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold">Verify Pass</button>
-          <div id="security-result" class="mt-4 hidden"></div>
+          <div class="mt-5 flex flex-wrap gap-3">
+            <button id="verify-pass-btn" type="button" class="bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold">Verify Pass</button>
+            <button id="security-scan-button" type="button" class="bg-green-700 text-white px-5 py-3 rounded-lg font-semibold">Verify by scanning</button>
+            <button id="security-stop-scan-button" type="button" class="hidden bg-gray-700 text-white px-5 py-3 rounded-lg font-semibold">Stop camera</button>
+          </div>
+          <div id="security-qr-reader" class="hidden mt-5 w-full max-w-md mx-auto overflow-hidden rounded-lg"></div>
+          <div id="security-result" class="mt-4 hidden" aria-live="polite"></div>
         </section>
       </div>
     `;
     document.getElementById('verify-pass-btn').addEventListener('click', async () => {
       const sapId = document.getElementById('security-sap-id').value.trim();
       const token = document.getElementById('security-pass-token').value.trim();
-      if (!sapId && !token) {
-        showMessage(document.getElementById('security-result'), 'Enter an SAP ID or pass token.', 'error');
+      if (Boolean(sapId) === Boolean(token)) {
+        showMessage(document.getElementById('security-result'), 'Enter either a SAP ID or a pass token, not both.', 'error');
         return;
       }
-      const params = new URLSearchParams();
-      if (sapId) params.set('sap_id', sapId);
-      if (token) params.set('token', token);
-      try {
-        const response = await fetch(`/api/index.php?endpoint=verify_pass.php&${params.toString()}`);
-        const result = await response.json();
-        if (!result.success) showMessage(document.getElementById('security-result'), result.message || 'Pass verification failed.', 'error');
-        else showMessage(document.getElementById('security-result'), `Verified: ${result.student_name} | Status: ${result.status} | Valid QR: ${result.valid_qr ? 'Yes' : 'No'}`, 'success');
-      } catch (error) {
-        console.error(error);
-        showMessage(document.getElementById('security-result'), 'Verification request failed.', 'error');
-      }
+      await verifySecurityPass({ sapId, token });
+    });
+    document.getElementById('security-scan-button').addEventListener('click', startSecurityScanner);
+    document.getElementById('security-stop-scan-button').addEventListener('click', async () => {
+      await stopSecurityScanner();
+      document.getElementById('security-qr-reader').classList.add('hidden');
+      document.getElementById('security-stop-scan-button').classList.add('hidden');
+      document.getElementById('security-scan-button').disabled = false;
     });
   }
 
@@ -738,6 +928,17 @@ document.addEventListener('DOMContentLoaded', () => {
     input.type = show ? 'text' : 'password';
     toggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
     toggle.title = show ? 'Hide password' : 'Show password';
+  });
+  document.querySelectorAll('[data-password-toggle]').forEach(button => {
+    button.addEventListener('click', () => {
+      const input = document.getElementById(button.dataset.passwordToggle);
+      if (!input) return;
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      const label = `${show ? 'Hide' : 'Show'} ${button.dataset.passwordLabel}`;
+      button.setAttribute('aria-label', label);
+      button.title = label;
+    });
   });
   roleSelect.addEventListener('change', updateRoleTitle);
   document.addEventListener('click', event => {

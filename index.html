@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script> 
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <!-- jsPDF library for PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
@@ -264,15 +265,30 @@
             <form id="change-password-form" class="space-y-4">
                 <div>
                     <label for="old-password" class="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
-                    <input id="old-password" type="password" required class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter current password">
+                    <div class="relative">
+                        <input id="old-password" type="password" required class="w-full p-3 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter current password">
+                        <button type="button" data-password-toggle="old-password" data-password-label="current password" class="absolute inset-y-0 right-0 px-4 text-gray-600 hover:text-blue-700" aria-label="Show current password" title="Show current password">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
                 </div>
                 <div>
                     <label for="new-password" class="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-                    <input id="new-password" type="password" required minlength="8" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter new password">
+                    <div class="relative">
+                        <input id="new-password" type="password" required minlength="8" class="w-full p-3 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter new password">
+                        <button type="button" data-password-toggle="new-password" data-password-label="new password" class="absolute inset-y-0 right-0 px-4 text-gray-600 hover:text-blue-700" aria-label="Show new password" title="Show new password">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
                 </div>
                 <div>
                     <label for="confirm-password" class="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-                    <input id="confirm-password" type="password" required minlength="8" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Confirm new password">
+                    <div class="relative">
+                        <input id="confirm-password" type="password" required minlength="8" class="w-full p-3 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Confirm new password">
+                        <button type="button" data-password-toggle="confirm-password" data-password-label="password confirmation" class="absolute inset-y-0 right-0 px-4 text-gray-600 hover:text-blue-700" aria-label="Show password confirmation" title="Show password confirmation">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
                 </div>
 
                 <div id="change-password-message" class="mt-4 p-3 rounded-lg text-sm hidden"></div>

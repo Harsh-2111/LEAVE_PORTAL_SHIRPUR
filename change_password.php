@@ -46,7 +46,10 @@ if (!$record || !password_verify($currentPassword, $record['password_hash'])) {
 }
 
 $hash = password_hash($newPassword, PASSWORD_DEFAULT);
-$update = $pdo->prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?');
+$updateSql = DB_DRIVER === 'pgsql'
+    ? 'UPDATE users SET password_hash = ?, must_change_password = FALSE WHERE id = ?'
+    : 'UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?';
+$update = $pdo->prepare($updateSql);
 $update->execute([$hash, (int)$user['id']]);
 
 writeAudit($pdo, (int)$user['id'], 'change_password', 'users', (int)$user['id'], [], $_SERVER['REMOTE_ADDR'] ?? null);
