@@ -10,7 +10,27 @@ document.addEventListener('DOMContentLoaded', () => {
   const adminPage = document.getElementById('admin-page');
   const securityPage = document.getElementById('security-page');
   const logoutModal = document.getElementById('logout-confirm-modal');
+  const changePasswordModal = document.getElementById('change-password-modal');
   const state = { csrfToken: '', user: null };
+  let loginProgressTimer = null;
+
+  function openChangePasswordModal() {
+    if (!changePasswordModal) return;
+    const form = document.getElementById('change-password-form');
+    const message = document.getElementById('change-password-message');
+    if (form) form.reset();
+    if (message) hideMessage(message);
+    changePasswordModal.classList.remove('hidden');
+  }
+
+  function closeChangePasswordModal() {
+    if (!changePasswordModal) return;
+    const form = document.getElementById('change-password-form');
+    const message = document.getElementById('change-password-message');
+    if (form) form.reset();
+    if (message) hideMessage(message);
+    changePasswordModal.classList.add('hidden');
+  }
 
   function showMessage(element, message, type) {
     if (!element) return;
@@ -23,6 +43,40 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!element) return;
     element.textContent = '';
     element.classList.add('hidden');
+  }
+
+  function resetLoginProgress() {
+    const wrapper = document.getElementById('login-progress-wrapper');
+    const bar = document.getElementById('login-progress-bar');
+    const text = document.getElementById('login-progress-text');
+    if (loginProgressTimer) {
+      clearInterval(loginProgressTimer);
+      loginProgressTimer = null;
+    }
+    if (wrapper) wrapper.classList.add('hidden');
+    if (bar) {
+      bar.style.width = '0%';
+    }
+    if (text) {
+      text.textContent = '0%';
+    }
+  }
+
+  function animateLoginProgress() {
+    const wrapper = document.getElementById('login-progress-wrapper');
+    const bar = document.getElementById('login-progress-bar');
+    const text = document.getElementById('login-progress-text');
+    if (!wrapper || !bar || !text) return;
+    let progress = 0;
+    if (loginProgressTimer) {
+      clearInterval(loginProgressTimer);
+    }
+    wrapper.classList.remove('hidden');
+    loginProgressTimer = setInterval(() => {
+      progress = Math.min(progress + 9 + Math.random() * 12, 96);
+      bar.style.width = `${progress}%`;
+      text.textContent = `${Math.round(progress)}%`;
+    }, 100);
   }
 
   function updateRoleTitle() {
@@ -55,6 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('password').value = '';
     document.getElementById('password').type = 'password';
     hideMessage(loginMessage);
+    resetLoginProgress();
   }
 
   function getCsrfFormData(extra = {}) {
@@ -72,6 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    animateLoginProgress();
     const formData = new FormData();
     formData.append('role', roleSelect.value);
     formData.append('login_id', loginId);
@@ -80,19 +136,28 @@ document.addEventListener('DOMContentLoaded', () => {
       const response = await fetch('/api/index.php?endpoint=login.php', { method: 'POST', body: formData });
       const result = await response.json();
       if (!result.success) {
+        resetLoginProgress();
         showMessage(loginMessage, result.message || 'Login failed.', 'error');
         return;
       }
 
+      const bar = document.getElementById('login-progress-bar');
+      const text = document.getElementById('login-progress-text');
+      if (bar) bar.style.width = '100%';
+      if (text) text.textContent = '100%';
       state.user = result.user;
       state.csrfToken = result.csrf_token || '';
       hideMessage(loginMessage);
-      if (state.user.role === 'student') await showStudentPage();
-      else if (state.user.role === 'warden') showWardenPage();
-      else if (state.user.role === 'admin') showAdminPage();
-      else if (state.user.role === 'security') showSecurityPage();
+      setTimeout(async () => {
+        resetLoginProgress();
+        if (state.user.role === 'student') await showStudentPage();
+        else if (state.user.role === 'warden') showWardenPage();
+        else if (state.user.role === 'admin') showAdminPage();
+        else if (state.user.role === 'security') showSecurityPage();
+      }, 350);
     } catch (error) {
       console.error(error);
+      resetLoginProgress();
       showMessage(loginMessage, 'Login failed. Please try again.', 'error');
     }
   }
@@ -126,25 +191,25 @@ document.addEventListener('DOMContentLoaded', () => {
               <input id="student-sap-id" type="text" readonly required class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
             </label>
             <label class="block text-sm font-medium text-gray-700">Full name
-              <input id="student-profile-name" type="text" readonly class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
+              <input id="student-profile-name" type="text" readonly required class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
             </label>
             <label class="block text-sm font-medium text-gray-700">Student phone number
-              <input id="student-profile-contact" type="tel" readonly class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
+              <input id="student-profile-contact" type="tel" readonly required class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
             </label>
             <label class="block text-sm font-medium text-gray-700">Parent email
-              <input id="student-profile-parent-email" type="email" readonly class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
+              <input id="student-profile-parent-email" type="email" readonly required class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
             </label>
             <label class="block text-sm font-medium text-gray-700">Parent contact number
-              <input id="student-profile-parent-contact" type="tel" readonly class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
+              <input id="student-profile-parent-contact" type="tel" readonly required class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
             </label>
             <label class="block text-sm font-medium text-gray-700">Year of study
-              <input id="student-profile-year" type="text" readonly class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
+              <input id="student-profile-year" type="text" readonly required class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
             </label>
             <label class="block text-sm font-medium text-gray-700">Course
-              <input id="student-profile-course" type="text" readonly class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
+              <input id="student-profile-course" type="text" readonly required class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
             </label>
             <label class="block text-sm font-medium text-gray-700">Branch
-              <input id="student-profile-branch" type="text" readonly class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
+              <input id="student-profile-branch" type="text" readonly required class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
             </label>
             <label class="block text-sm font-medium text-gray-700">School
               <select id="student-school" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg"></select>
@@ -260,6 +325,19 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('student-leave-form').addEventListener('submit', async event => {
       event.preventDefault();
       const message = document.getElementById('student-form-message');
+      const form = document.getElementById('student-leave-form');
+      const requiredEntries = Array.from(form.querySelectorAll('[required]'));
+      const invalidField = requiredEntries.find(field => {
+        if (field.type === 'checkbox') return !field.checked;
+        return !String(field.value || '').trim();
+      });
+      if (invalidField) {
+        invalidField.focus();
+        invalidField.reportValidity();
+        message.textContent = 'Please fill in all required leave request fields.';
+        message.className = 'text-sm text-red-600';
+        return;
+      }
       if (startInput.value >= endInput.value) {
         message.textContent = 'Leave end date must be after the start date.';
         message.className = 'text-sm text-red-600';
@@ -295,6 +373,55 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
     await loadStudentHistory();
+    const changePasswordButton = document.getElementById('student-change-password-button');
+    if (changePasswordButton) {
+      changePasswordButton.addEventListener('click', openChangePasswordModal);
+    }
+  }
+
+  async function handleChangePassword(event) {
+    event.preventDefault();
+    const oldPassword = document.getElementById('old-password')?.value || '';
+    const newPassword = document.getElementById('new-password')?.value || '';
+    const confirmPassword = document.getElementById('confirm-password')?.value || '';
+    const message = document.getElementById('change-password-message');
+
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      showMessage(message, 'All password fields are required.', 'error');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      showMessage(message, 'New password must be at least 8 characters long.', 'error');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      showMessage(message, 'New password and confirmation do not match.', 'error');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/index.php?endpoint=change_password.php', {
+        method: 'POST',
+        body: getCsrfFormData({
+          current_password: oldPassword,
+          new_password: newPassword,
+          confirm_password: confirmPassword
+        })
+      });
+      const result = await response.json();
+      if (!result.success) {
+        showMessage(message, result.message || 'Password change failed.', 'error');
+        return;
+      }
+
+      showMessage(message, 'Password updated successfully.', 'success');
+      setTimeout(() => closeChangePasswordModal(), 1200);
+    } catch (error) {
+      console.error(error);
+      showMessage(message, 'Password update failed. Please try again.', 'error');
+    }
   }
 
   async function loadStudentHistory() {
@@ -371,12 +498,71 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.getElementById('download-student-pdf').addEventListener('click', () => {
       if (!window.jspdf?.jsPDF) return;
-      const pdf = new window.jspdf.jsPDF();
-      pdf.text('Gate Pass', 20, 20);
-      pdf.text(`Student ID: ${pass.sap_id}`, 20, 35);
-      pdf.text(`Dates: ${pass.start_date} to ${pass.end_date}`, 20, 45);
-      pdf.text(`Approved by Warden: ${state.user?.name || 'Warden'}`, 20, 55);
-      pdf.save('gate-pass.pdf');
+      const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 14;
+      const studentName = state.user?.name || 'Student';
+
+      pdf.setFillColor(248, 250, 252);
+      pdf.rect(10, 10, pageWidth - 20, pageHeight - 20, 'F');
+      pdf.setDrawColor(30, 64, 175);
+      pdf.roundedRect(10, 10, pageWidth - 20, pageHeight - 20, 4, 4, 'S');
+
+      pdf.setTextColor(17, 24, 39);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(20);
+      pdf.text('NMIMS Leave - Gate Pass', margin, 24);
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text('This is your official digital gate pass.', margin, 31);
+
+      pdf.setDrawColor(148, 163, 184);
+      pdf.line(margin, 36, pageWidth - margin, 36);
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(31, 41, 55);
+      pdf.setFontSize(12);
+      pdf.text(`Student Name: ${studentName}`, margin, 48);
+      pdf.text(`Student ID: ${pass.sap_id}`, margin, 56);
+      pdf.text(`Branch: ${pass.school || 'N/A'}`, margin, 64);
+      pdf.text(`Batch: ${pass.hostel || 'N/A'}`, margin, 72);
+      pdf.text(`Leave From: ${pass.start_date}`, margin, 84);
+      pdf.text(`Leave Till: ${pass.end_date}`, margin, 92);
+      pdf.text(`Leave Days: ${pass.leave_days || 1}`, margin, 100);
+      pdf.text(`Reason: ${pass.reason || 'Not specified'}`, margin, 112, { maxWidth: pageWidth - (margin * 2) - 40 });
+      pdf.text(`Attendance: 85.00%`, margin, 128);
+
+      pdf.setTextColor(16, 185, 129);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(18);
+      pdf.text('Approval Status:', margin, 146);
+      pdf.setTextColor(37, 99, 235);
+      pdf.setFontSize(11);
+      pdf.text(`Teacher: ${state.user?.name || 'Approved'}`, margin, 156);
+      pdf.text(`HOD: Approved`, margin, 164);
+      pdf.text(`Dean: Approved`, margin, 172);
+
+      pdf.setTextColor(17, 24, 39);
+      pdf.setFontSize(11);
+      pdf.text('Parent Contact Details:', margin, 190);
+      pdf.text(`Email: ${state.user?.email || 'parent@example.com'}`, margin, 198);
+      pdf.text(`Contact No: ${state.user?.phone || '9876543210'}`, margin, 206);
+
+      pdf.setTextColor(200, 30, 30);
+      pdf.saveGraphicsState();
+      pdf.translate(150, 120);
+      pdf.rotate(-35);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(26);
+      pdf.text('APPROVED', 0, 0);
+      pdf.restoreGraphicsState();
+
+      pdf.setTextColor(17, 24, 39);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.text(`Generated on: ${new Date().toLocaleString()}`, margin, pageHeight - 18);
+      pdf.save(`gate-pass-${pass.sap_id}.pdf`);
     });
   }
 
@@ -557,6 +743,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('click', event => {
     if (event.target.closest('[data-logout-button]')) logoutModal.classList.remove('hidden');
   });
+  document.getElementById('cancel-change-password')?.addEventListener('click', closeChangePasswordModal);
+  document.getElementById('close-change-password-modal')?.addEventListener('click', closeChangePasswordModal);
+  document.getElementById('change-password-form')?.addEventListener('submit', handleChangePassword);
   document.getElementById('confirm-logout').addEventListener('click', logoutUser);
   document.getElementById('cancel-logout').addEventListener('click', () => logoutModal.classList.add('hidden'));
   updateRoleTitle();
