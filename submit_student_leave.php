@@ -47,10 +47,10 @@ if ($reason === '' || strlen($reason) > 2000) {
     exit;
 }
 
-$studentStmt = $pdo->prepare('SELECT gender, course, is_active FROM students WHERE sap_id = ? LIMIT 1');
+$studentStmt = $pdo->prepare('SELECT gender, course FROM students WHERE sap_id = ? AND is_active = TRUE LIMIT 1');
 $studentStmt->execute([$sapId]);
 $student = $studentStmt->fetch();
-if (!$student || !(bool)$student['is_active'] || !in_array($student['gender'], ['male', 'female'], true) || !in_array($student['course'], ['BTech', 'MBATech', 'BPharm', 'MPharm', 'Agriculture'], true)) {
+if (!$student || !in_array($student['gender'], ['male', 'female'], true) || !in_array($student['course'], ['BTech', 'MBATech', 'BPharm', 'MPharm', 'Agriculture'], true)) {
     http_response_code(422);
     echo json_encode(['success' => false, 'message' => 'Your student profile is incomplete. Contact the administrator to update it.']);
     exit;
@@ -75,9 +75,12 @@ if ($overlap->fetch()) {
 }
 
 $leaveDays = (int)$start->diff($end)->format('%a') + 1;
-$insert = $pdo->prepare('INSERT INTO leave_requests (sap_id, start_date, end_date, leave_days, reason, school, hostel, email_from, email_received_at, parent_email_matched, logged_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, 0, ?, \'Pending Verification\', NOW())');
+$insertSql = DB_DRIVER === 'pgsql'
+    ? 'INSERT INTO leave_requests (sap_id, start_date, end_date, leave_days, reason, school, hostel, email_from, email_received_at, parent_email_matched, logged_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, FALSE, ?, \'Pending Verification\', NOW()) RETURNING id'
+    : 'INSERT INTO leave_requests (sap_id, start_date, end_date, leave_days, reason, school, hostel, email_from, email_received_at, parent_email_matched, logged_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, 0, ?, \'Pending Verification\', NOW())';
+$insert = $pdo->prepare($insertSql);
 $insert->execute([$sapId, $startDate, $endDate, $leaveDays, $reason, $school, $hostel, (int)$user['id']]);
-$leaveId = (int)$pdo->lastInsertId();
+$leaveId = DB_DRIVER === 'pgsql' ? (int)$insert->fetchColumn() : (int)$pdo->lastInsertId();
 
 writeAudit($pdo, (int)$user['id'], 'submit_student_leave', 'leave_requests', $leaveId, ['sap_id' => $sapId, 'school' => $school, 'hostel' => $hostel], $_SERVER['REMOTE_ADDR'] ?? null);
 

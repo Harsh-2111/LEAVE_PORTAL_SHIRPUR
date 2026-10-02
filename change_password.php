@@ -35,7 +35,7 @@ if ($newPassword !== $confirmPassword) {
     exit;
 }
 
-$stmt = $pdo->prepare('SELECT password_hash FROM users WHERE id = ? AND is_active = 1 LIMIT 1');
+$stmt = $pdo->prepare('SELECT password_hash FROM users WHERE id = ? AND is_active = TRUE LIMIT 1');
 $stmt->execute([(int)$user['id']]);
 $record = $stmt->fetch();
 

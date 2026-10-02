@@ -24,7 +24,7 @@ if ($sapId === '') {
     exit;
 }
 
-$stmt = $pdo->prepare('SELECT sap_id, name, student_contact, gender, course, year, branch, batch, hostel_block, room_no, parent_name, parent_email, parent_contact, is_active FROM students WHERE sap_id = ? AND is_active = 1 LIMIT 1');
+$stmt = $pdo->prepare('SELECT sap_id, name, student_contact, gender, course, year, branch, batch, hostel_block, room_no, parent_name, parent_email, parent_contact FROM students WHERE sap_id = ? AND is_active = TRUE LIMIT 1');
 $stmt->execute([$sapId]);
 $student = $stmt->fetch();
 

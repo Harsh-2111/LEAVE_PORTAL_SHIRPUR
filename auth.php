@@ -26,7 +26,10 @@ final class PdoSessionHandler implements SessionHandlerInterface
     public function write(string $sessionId, string $sessionData): bool
     {
         $expiresAt = time() + (int)ini_get('session.gc_maxlifetime');
-        $stmt = $this->pdo->prepare('INSERT INTO app_sessions (session_id, session_data, expires_at) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE session_data = VALUES(session_data), expires_at = VALUES(expires_at)');
+        $sql = DB_DRIVER === 'pgsql'
+            ? 'INSERT INTO app_sessions (session_id, session_data, expires_at) VALUES (?, ?, ?) ON CONFLICT (session_id) DO UPDATE SET session_data = EXCLUDED.session_data, expires_at = EXCLUDED.expires_at'
+            : 'INSERT INTO app_sessions (session_id, session_data, expires_at) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE session_data = VALUES(session_data), expires_at = VALUES(expires_at)';
+        $stmt = $this->pdo->prepare($sql);
         return $stmt->execute([$sessionId, $sessionData, $expiresAt]);
     }
 
@@ -49,8 +52,14 @@ function startSecureSession(): void
     if (session_status() === PHP_SESSION_NONE) {
         if (!isset($GLOBALS['pdo']) || !($GLOBALS['pdo'] instanceof PDO)) {
             require_once __DIR__ . '/db.php';
+            if (!isset($GLOBALS['pdo']) && isset($pdo) && $pdo instanceof PDO) {
+                $GLOBALS['pdo'] = $pdo;
+            }
         }
-        $pdo = $GLOBALS['pdo'];
+        $pdo = $GLOBALS['pdo'] ?? ($pdo ?? null);
+        if (!($pdo instanceof PDO)) {
+            throw new RuntimeException('Database connection is not available for session storage.');
+        }
 
         ini_set('session.cookie_httponly', '1');
         ini_set('session.use_only_cookies', '1');
@@ -72,6 +81,15 @@ function issueCsrfToken(): string
     }
 
     return $_SESSION['csrf_token'];
+}
+
+function databaseBool(mixed $value): bool
+{
+    if (is_bool($value)) {
+        return $value;
+    }
+
+    return in_array(strtolower((string)$value), ['1', 't', 'true', 'yes', 'on'], true);
 }
 
 function requireCsrfToken(): void
@@ -114,7 +132,9 @@ function requireRole(array $roles): array
 
 function writeAudit(PDO $pdo, ?int $userId, string $action, string $entity, ?int $entityId = null, array $details = [], ?string $ip = null): void
 {
-    $sql = 'INSERT INTO audit_log (user_id, action, entity, entity_id, details, ip, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())';
+    $sql = DB_DRIVER === 'pgsql'
+        ? 'INSERT INTO audit_log (user_id, action, entity, entity_id, details, ip, created_at) VALUES (?, ?, ?, ?, CAST(? AS JSONB), ?, NOW())'
+        : 'INSERT INTO audit_log (user_id, action, entity, entity_id, details, ip, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())';
     $stmt = $pdo->prepare($sql);
     $payload = json_encode($details, JSON_UNESCAPED_SLASHES);
     $stmt->execute([$userId, $action, $entity, $entityId, $payload, $ip]);

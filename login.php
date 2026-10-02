@@ -22,7 +22,7 @@ if ($role === '' || $loginId === '' || $password === '') {
     exit;
 }
 
-$stmt = $pdo->prepare('SELECT id, login_id, password_hash, role, warden_gender, name, must_change_password, is_active FROM users WHERE login_id = ? AND role = ? AND is_active = 1 LIMIT 1');
+$stmt = $pdo->prepare('SELECT id, login_id, password_hash, role, warden_gender, name, must_change_password, is_active FROM users WHERE login_id = ? AND role = ? AND is_active = TRUE LIMIT 1');
 $stmt->execute([$loginId, $role]);
 $user = $stmt->fetch();
 
@@ -38,7 +38,7 @@ $_SESSION['user'] = [
     'role' => $user['role'],
     'warden_gender' => $user['warden_gender'],
     'name' => $user['name'],
-    'must_change_password' => (bool)$user['must_change_password'],
+    'must_change_password' => databaseBool($user['must_change_password']),
 ];
 $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 

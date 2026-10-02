@@ -158,13 +158,19 @@ while (($row = fgetcsv($handle)) !== false) {
         continue;
     }
 
-    $studentStmt = $pdo->prepare('INSERT INTO students (sap_id, name, student_contact, gender, course, year, branch, batch, hostel_block, room_no, parent_name, parent_email, parent_contact, is_active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW()) ON DUPLICATE KEY UPDATE name = VALUES(name), student_contact = VALUES(student_contact), gender = VALUES(gender), course = VALUES(course), year = VALUES(year), branch = VALUES(branch), batch = VALUES(batch), hostel_block = VALUES(hostel_block), room_no = VALUES(room_no), parent_name = VALUES(parent_name), parent_email = VALUES(parent_email), parent_contact = VALUES(parent_contact), is_active = 1, updated_at = NOW()');
+    $studentSql = DB_DRIVER === 'pgsql'
+        ? 'INSERT INTO students (sap_id, name, student_contact, gender, course, year, branch, batch, hostel_block, room_no, parent_name, parent_email, parent_contact, is_active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, NOW()) ON CONFLICT (sap_id) DO UPDATE SET name = EXCLUDED.name, student_contact = EXCLUDED.student_contact, gender = EXCLUDED.gender, course = EXCLUDED.course, year = EXCLUDED.year, branch = EXCLUDED.branch, batch = EXCLUDED.batch, hostel_block = EXCLUDED.hostel_block, room_no = EXCLUDED.room_no, parent_name = EXCLUDED.parent_name, parent_email = EXCLUDED.parent_email, parent_contact = EXCLUDED.parent_contact, is_active = TRUE, updated_at = NOW()'
+        : 'INSERT INTO students (sap_id, name, student_contact, gender, course, year, branch, batch, hostel_block, room_no, parent_name, parent_email, parent_contact, is_active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW()) ON DUPLICATE KEY UPDATE name = VALUES(name), student_contact = VALUES(student_contact), gender = VALUES(gender), course = VALUES(course), year = VALUES(year), branch = VALUES(branch), batch = VALUES(batch), hostel_block = VALUES(hostel_block), room_no = VALUES(room_no), parent_name = VALUES(parent_name), parent_email = VALUES(parent_email), parent_contact = VALUES(parent_contact), is_active = 1, updated_at = NOW()';
+    $studentStmt = $pdo->prepare($studentSql);
     $studentStmt->execute([$sapId, $studentName, $studentContact, $gender, $course, $year, $branch, $batch, $hostelBlock, $roomNo, $parentName, $parentEmail, $parentContact]);
 
     $tempPassword = 'Student@' . substr($sapId, -4);
     $passwordHash = password_hash($tempPassword, PASSWORD_DEFAULT);
 
-    $userStmt = $pdo->prepare('INSERT INTO users (login_id, password_hash, role, name, must_change_password, is_active) VALUES (?, ?, ?, ?, 1, 1) ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), role = VALUES(role), name = VALUES(name), must_change_password = 1, is_active = 1');
+    $userSql = DB_DRIVER === 'pgsql'
+        ? 'INSERT INTO users (login_id, password_hash, role, name, must_change_password, is_active) VALUES (?, ?, ?, ?, TRUE, TRUE) ON CONFLICT (login_id) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = EXCLUDED.role, name = EXCLUDED.name, must_change_password = TRUE, is_active = TRUE'
+        : 'INSERT INTO users (login_id, password_hash, role, name, must_change_password, is_active) VALUES (?, ?, ?, ?, 1, 1) ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), role = VALUES(role), name = VALUES(name), must_change_password = 1, is_active = 1';
+    $userStmt = $pdo->prepare($userSql);
     $userStmt->execute([$sapId, $passwordHash, 'student', $studentName]);
 
     writeAudit($pdo, (int)$user['id'], 'import_students', 'students', null, ['sap_id' => $sapId], $_SERVER['REMOTE_ADDR'] ?? null);

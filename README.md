@@ -45,18 +45,31 @@ docker compose exec db mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" hostel_leave >
 
 The database is created automatically from the schema file in the project root and then seeded with dev data on first boot.
 
-## Vercel deployment
+## Vercel deployment with Supabase
 
-Vercel needs the included `vercel.json` to execute PHP through the `vercel-php` community runtime. All API requests are routed through one `api/index.php` function to avoid a function-per-PHP-file deployment and to prevent PHP source files from being published as static files. The PHP runtime supports PDO MySQL, and PHP sessions are stored in the database so they work across separate function invocations.
+The application supports both local MySQL and Supabase PostgreSQL. Docker keeps using MySQL by default; set `DB_DRIVER=pgsql` on Vercel. Vercel uses the included `vercel.json` and `vercel-php` runtime. All API requests are routed through one `api/index.php` function, and PHP sessions are stored in the database so they work across serverless requests.
 
-Vercel cannot reach the `db` hostname from `docker-compose.yml`; that name only exists inside the local Compose network. Create an externally reachable MySQL database, initialize it with `hostel_leave_schema_v2.sql`, `dev_seed.sql`, and `hostel_leave_migration_v3.sql`, then add these variables in Vercel Project Settings under Environment Variables:
+1. Create a Supabase project and open **SQL Editor**.
+2. Run `supabase_schema.sql`, then run `supabase_seed.sql` to create the tables and demo accounts. Do not use the MySQL schema/seed files for Supabase.
+3. In the Supabase dashboard, choose **Connect → Transaction pooler**. Copy the host, port, username, and password from the connection details. Supabase recommends this mode for serverless functions; its default port is `6543` and the shared-pooler username is usually `postgres.<project-ref>`.
+4. In Vercel **Project → Settings → Environment Variables**, set these for **Production**:
 
-- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASS` for the hosted MySQL database
-- `QR_HMAC_SECRET` set to a unique, long random value
-- `HOSTEL_EMAIL`
-- `APP_ENV=production`
+| Variable | Value |
+| --- | --- |
+| `DB_DRIVER` | `pgsql` |
+| `DB_HOST` | Supabase transaction-pooler host from Connect |
+| `DB_PORT` | Supabase transaction-pooler port, usually `6543` |
+| `DB_NAME` | `postgres` (or the database shown in the connection string) |
+| `DB_USER` | Supabase pooler username from Connect |
+| `DB_PASS` | Supabase database password |
+| `DB_SSLMODE` | `require` |
+| `QR_HMAC_SECRET` | A unique, long random value |
+| `HOSTEL_EMAIL` | Your hostel contact email |
+| `APP_ENV` | `production` |
 
-Do not use `db` for Vercel's `DB_HOST`, and do not use the placeholder values from `.env.example` as production credentials. After setting the database variables and redeploying, check that a POST to `/login.php` returns JSON; the Vercel static deployment previously served PHP files as source rather than executing them.
+5. Redeploy the latest commit. The PHP client uses emulated prepares for the Supabase transaction pooler and requires SSL. The browser calls the API through `/api/index.php?endpoint=...`; root-level PHP URLs are not function routes.
+
+Do not use the direct database host if it is unreachable from Vercel, and do not use any placeholder values from `.env.example` as production credentials. Keep database passwords and QR secrets in Vercel, not in Git or chat. Local Docker continues using MySQL by default; set `DB_DRIVER=mysql` there.
 
 ## Demo accounts
 
