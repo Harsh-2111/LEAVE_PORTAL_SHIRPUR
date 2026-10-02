@@ -45,6 +45,19 @@ docker compose exec db mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" hostel_leave >
 
 The database is created automatically from the schema file in the project root and then seeded with dev data on first boot.
 
+## Vercel deployment
+
+Vercel needs the included `vercel.json` to execute PHP through the `vercel-php` community runtime. PHP files are built as functions rather than published as source files. The PHP runtime supports PDO MySQL, and PHP sessions are stored in the database so they work across separate function invocations.
+
+Vercel cannot reach the `db` hostname from `docker-compose.yml`; that name only exists inside the local Compose network. Create an externally reachable MySQL database, initialize it with `hostel_leave_schema_v2.sql`, `dev_seed.sql`, and `hostel_leave_migration_v3.sql`, then add these variables in Vercel Project Settings under Environment Variables:
+
+- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASS` for the hosted MySQL database
+- `QR_HMAC_SECRET` set to a unique, long random value
+- `HOSTEL_EMAIL`
+- `APP_ENV=production`
+
+Do not use `db` for Vercel's `DB_HOST`, and do not use the placeholder values from `.env.example` as production credentials. After setting the database variables and redeploying, check that a POST to `/login.php` returns JSON; the Vercel static deployment previously served PHP files as source rather than executing them.
+
 ## Demo accounts
 
 Choose the matching role on the login screen:

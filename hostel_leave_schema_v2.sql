@@ -104,3 +104,11 @@ CREATE TABLE `audit_log` (
   KEY `idx_audit_entity` (`entity`, `entity_id`),
   CONSTRAINT `fk_audit_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `app_sessions` (
+  `session_id` VARCHAR(128) NOT NULL,
+  `session_data` MEDIUMBLOB NOT NULL,
+  `expires_at` BIGINT UNSIGNED NOT NULL,
+  PRIMARY KEY (`session_id`),
+  KEY `idx_app_sessions_expires` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
