@@ -182,7 +182,10 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="max-w-5xl mx-auto">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
           <h1 class="text-3xl font-bold text-gray-800">Student Portal</h1>
-          <button type="button" data-logout-button class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold">Logout</button>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" id="student-change-password-button" class="bg-amber-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-amber-600">Change Password</button>
+            <button type="button" data-logout-button class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold">Logout</button>
+          </div>
         </div>
         <section class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm mb-6">
           <h2 class="text-2xl font-semibold text-gray-700 mb-4">Submit Leave Request</h2>
@@ -247,6 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </section>
       </div>
     `;
+    document.getElementById('student-change-password-button').addEventListener('click', openChangePasswordModal);
 
     const sapInput = document.getElementById('student-sap-id');
     const schoolSelect = document.getElementById('student-school');
@@ -373,10 +377,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
     await loadStudentHistory();
-    const changePasswordButton = document.getElementById('student-change-password-button');
-    if (changePasswordButton) {
-      changePasswordButton.addEventListener('click', openChangePasswordModal);
-    }
   }
 
   async function handleChangePassword(event) {
