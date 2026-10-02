@@ -1,0 +1,146 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+body {
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    margin: 0;
+    padding: 0.75rem;
+    box-sizing: border-box;
+    background-image: url('https://images.shiksha.com/mediadata/images/1670521973phpnF1TE6.jpeg');
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    overflow-x: hidden;
+}
+
+*, *::before, *::after {
+    box-sizing: inherit;
+}
+
+#app-container {
+    width: min(100%, 1180px);
+    max-width: 100%;
+    min-width: 0;
+    border-radius: 1rem;
+    padding: 2rem;
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(50px);
+    -webkit-backdrop-filter: blur(10px);
+    overflow-x: hidden;
+}
+
+#app-container.portal-wide {
+    max-width: 1180px !important;
+}
+
+#app-container > * {
+    min-width: 0;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="tel"],
+textarea,
+select {
+    border-radius: 0.5rem;
+    max-width: 100%;
+    min-width: 0;
+}
+
+/* Styling for buttons */
+button {
+    border-radius: 0.5rem; /* Tailwind's rounded-lg */
+}
+
+/* Message box styling */
+#message-box.success {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+#message-box.error {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+#message-box.info {
+    background-color: #e0f2fe;
+    color: #1e40af;
+}
+
+#message-box {
+    white-space: normal;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+}
+
+/* Responsive support for mobile and tablet layouts */
+@media (max-width: 768px) {
+    body {
+        padding: 0.75rem;
+    }
+
+    #app-container {
+        padding: 1rem;
+        border-radius: 0.9rem;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+        font-size: 16px;
+    }
+
+    .flex.gap-2,
+    .flex.gap-3,
+    .flex.gap-4 {
+        flex-direction: column;
+    }
+
+    .grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .w-full,
+    .max-w-md,
+    .max-w-lg,
+    .max-w-3xl,
+    .max-w-4xl,
+    .max-w-5xl {
+        max-width: 100% !important;
+    }
+
+    table {
+        min-width: 640px;
+    }
+}
+
+@media (max-width: 480px) {
+    body {
+        padding: 0.5rem;
+    }
+
+    #app-container {
+        padding: 0.8rem;
+    }
+
+    h1 {
+        font-size: clamp(1.6rem, 7vw, 2.3rem);
+    }
+
+    h2,
+    h3 {
+        font-size: clamp(1.1rem, 5vw, 1.6rem);
+    }
+}
+
+/* Custom Logout Confirmation Modal Styling */
+#logout-confirm-modal {
+    transition: opacity 0.3s ease-in-out;
+}

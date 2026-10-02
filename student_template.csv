@@ -1,0 +1,2 @@
+sap_id,name,student_contact,gender,course,year,branch,batch,hostel_block,room_no,parent_name,parent_email,parent_contact
+12345678905,Student Name,9822000005,male,BTech,2,BTECH CS,A1,A,101,Parent Name,parent@example.com,9876543210

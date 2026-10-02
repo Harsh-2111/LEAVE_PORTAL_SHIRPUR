@@ -1,0 +1,17 @@
+# Environment files
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Uploaded files
+uploads/
+*.csv
+!student_template.csv
+
+# Logs
+logs/
+*.log
+
+# Docker artifacts
+*.pid
