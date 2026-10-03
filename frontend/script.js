@@ -11,7 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const securityPage = document.getElementById('security-page');
   const logoutModal = document.getElementById('logout-confirm-modal');
   const changePasswordModal = document.getElementById('change-password-modal');
-  const state = { csrfToken: '', user: null, wardenApprovedHistory: [] };
+  const forgotPasswordModal = document.getElementById('forgot-password-modal');
+  const state = { csrfToken: '', user: null, wardenApprovedHistory: [], forgotResetToken: '', forgotCsrfToken: '' };
   let loginProgressTimer = null;
   let securityQrScanner = null;
   let handlingSecurityScan = false;
@@ -34,6 +35,118 @@ document.addEventListener('DOMContentLoaded', () => {
     resetChangePasswordVisibility();
     if (message) hideMessage(message);
     changePasswordModal.classList.add('hidden');
+  }
+
+  function openForgotPasswordModal() {
+    document.getElementById('forgot-password-identity-form').reset();
+    document.getElementById('forgot-password-reset-form').reset();
+    resetForgotPasswordVisibility();
+    document.getElementById('forgot-password-identity-form').classList.remove('hidden');
+    document.getElementById('forgot-password-reset-form').classList.add('hidden');
+    hideMessage(document.getElementById('forgot-password-identity-message'));
+    hideMessage(document.getElementById('forgot-password-reset-message'));
+    state.forgotResetToken = '';
+    state.forgotCsrfToken = '';
+    forgotPasswordModal.classList.remove('hidden');
+  }
+
+  function closeForgotPasswordModal() {
+    document.getElementById('forgot-password-identity-form').reset();
+    document.getElementById('forgot-password-reset-form').reset();
+    resetForgotPasswordVisibility();
+    document.getElementById('forgot-password-identity-form').classList.remove('hidden');
+    document.getElementById('forgot-password-reset-form').classList.add('hidden');
+    hideMessage(document.getElementById('forgot-password-identity-message'));
+    hideMessage(document.getElementById('forgot-password-reset-message'));
+    state.forgotResetToken = '';
+    state.forgotCsrfToken = '';
+    forgotPasswordModal.classList.add('hidden');
+  }
+
+  function resetForgotPasswordVisibility() {
+    document.querySelectorAll('#forgot-password-reset-form [data-password-toggle]').forEach(button => {
+      const input = document.getElementById(button.dataset.passwordToggle);
+      if (!input) return;
+      input.type = 'password';
+      const label = `Show ${button.dataset.passwordLabel}`;
+      button.setAttribute('aria-label', label);
+      button.title = label;
+    });
+  }
+
+  async function handleForgotPasswordIdentity(event) {
+    event.preventDefault();
+    const button = document.getElementById('verify-forgot-password-button');
+    const message = document.getElementById('forgot-password-identity-message');
+    button.disabled = true;
+    const formData = new FormData(event.currentTarget);
+    formData.append('action', 'verify');
+    formData.append('sap_id', document.getElementById('forgot-sap-id').value.trim());
+    formData.append('contact', document.getElementById('forgot-contact').value.trim());
+    formData.append('email', document.getElementById('forgot-email').value.trim());
+
+    try {
+      const response = await fetch('/api/index.php?endpoint=forgot_password.php', { method: 'POST', body: formData });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        showMessage(message, result.message || 'Password recovery could not be completed.', 'text-red-700 bg-red-50');
+        return;
+      }
+
+      state.forgotResetToken = result.reset_token;
+      state.forgotCsrfToken = result.csrf_token;
+      document.getElementById('forgot-password-identity-form').classList.add('hidden');
+      document.getElementById('forgot-password-reset-form').classList.remove('hidden');
+      hideMessage(message);
+    } catch (error) {
+      console.error(error);
+      showMessage(message, 'Password recovery request failed. Please try again.', 'text-red-700 bg-red-50');
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function handleForgotPasswordReset(event) {
+    event.preventDefault();
+    const button = document.getElementById('reset-forgot-password-button');
+    const message = document.getElementById('forgot-password-reset-message');
+    const newPassword = document.getElementById('forgot-new-password').value;
+    const confirmPassword = document.getElementById('forgot-confirm-password').value;
+    if (newPassword.length < 8) {
+      showMessage(message, 'New password must be at least 8 characters long.', 'text-red-700 bg-red-50');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showMessage(message, 'New password and confirmation do not match.', 'text-red-700 bg-red-50');
+      return;
+    }
+
+    button.disabled = true;
+    const formData = new FormData();
+    formData.append('action', 'reset');
+    formData.append('csrf_token', state.forgotCsrfToken);
+    formData.append('reset_token', state.forgotResetToken);
+    formData.append('new_password', newPassword);
+    formData.append('confirm_password', confirmPassword);
+
+    try {
+      const response = await fetch('/api/index.php?endpoint=forgot_password.php', { method: 'POST', body: formData });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        showMessage(message, result.message || 'Password reset could not be completed.', 'text-red-700 bg-red-50');
+        return;
+      }
+
+      showMessage(message, result.message || 'Password reset successfully.', 'text-green-700 bg-green-50');
+      state.forgotResetToken = '';
+      state.forgotCsrfToken = '';
+      setTimeout(() => closeForgotPasswordModal(), 1400);
+    } catch (error) {
+      console.error(error);
+      showMessage(message, 'Password reset request failed. Please try again.', 'text-red-700 bg-red-50');
+    } finally {
+      button.disabled = false;
+    }
   }
 
   function resetChangePasswordVisibility() {
@@ -102,6 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
       security: 'Security Login'
     };
     roleTitle.textContent = labels[roleSelect.value] || 'Login';
+    document.getElementById('student-forgot-password-button')?.classList.toggle('hidden', roleSelect.value !== 'student');
   }
 
   function hideAllPages() {
@@ -1181,6 +1295,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cancel-change-password')?.addEventListener('click', closeChangePasswordModal);
   document.getElementById('close-change-password-modal')?.addEventListener('click', closeChangePasswordModal);
   document.getElementById('change-password-form')?.addEventListener('submit', handleChangePassword);
+  document.getElementById('student-forgot-password-button')?.addEventListener('click', openForgotPasswordModal);
+  document.getElementById('close-forgot-password-modal')?.addEventListener('click', closeForgotPasswordModal);
+  document.getElementById('forgot-password-identity-form')?.addEventListener('submit', handleForgotPasswordIdentity);
+  document.getElementById('forgot-password-reset-form')?.addEventListener('submit', handleForgotPasswordReset);
   document.getElementById('confirm-logout').addEventListener('click', logoutUser);
   document.getElementById('cancel-logout').addEventListener('click', () => logoutModal.classList.add('hidden'));
   updateRoleTitle();

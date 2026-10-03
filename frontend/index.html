@@ -53,6 +53,8 @@
                 </div>
             </div>
 
+            <button id="student-forgot-password-button" type="button" class="mt-4 text-sm font-semibold text-blue-700 underline hover:text-blue-900">Forgot password?</button>
+
         </form>
         
         <div id="message-box" class="mt-4 p-3 rounded-lg text-sm hidden"></div>
@@ -297,6 +299,52 @@
                     <button type="button" id="cancel-change-password" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Cancel</button>
                     <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Update Password</button>
                 </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="forgot-password-modal" class="fixed inset-0 hidden bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-xl font-semibold text-gray-800">Recover student account</h2>
+                <button type="button" id="close-forgot-password-modal" class="text-gray-500 hover:text-gray-700 text-2xl leading-none" aria-label="Close">×</button>
+            </div>
+            <p class="mb-4 text-sm text-gray-600">Your old password cannot be shown. Verify your student record to set a new one.</p>
+
+            <form id="forgot-password-identity-form" class="space-y-4">
+                <label class="block text-sm font-medium text-gray-700">SAP ID
+                    <input id="forgot-sap-id" type="text" inputmode="numeric" autocomplete="username" maxlength="11" minlength="11" required class="mt-1 w-full p-3 border border-gray-300 rounded-lg" placeholder="11-digit SAP ID">
+                </label>
+                <label class="block text-sm font-medium text-gray-700">Registered student or parent contact number
+                    <input id="forgot-contact" type="tel" inputmode="tel" autocomplete="tel" required class="mt-1 w-full p-3 border border-gray-300 rounded-lg" placeholder="Contact number on record">
+                </label>
+                <label class="block text-sm font-medium text-gray-700">Email on the student record
+                    <input id="forgot-email" type="email" autocomplete="email" required class="mt-1 w-full p-3 border border-gray-300 rounded-lg" placeholder="Email on record">
+                </label>
+                <div id="forgot-password-identity-message" class="hidden rounded-lg p-3 text-sm" aria-live="polite"></div>
+                <button id="verify-forgot-password-button" type="submit" class="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700">Verify details</button>
+            </form>
+
+            <form id="forgot-password-reset-form" class="hidden space-y-4">
+                <p class="rounded-lg bg-green-50 p-3 text-sm text-green-800">Details matched. Set a new password for this account.</p>
+                <label class="block text-sm font-medium text-gray-700">New password
+                    <div class="relative mt-1">
+                        <input id="forgot-new-password" type="password" minlength="8" required class="w-full p-3 pr-12 border border-gray-300 rounded-lg" placeholder="At least 8 characters">
+                        <button type="button" data-password-toggle="forgot-new-password" data-password-label="new password" class="absolute inset-y-0 right-0 px-4 text-gray-600" aria-label="Show new password" title="Show new password">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
+                </label>
+                <label class="block text-sm font-medium text-gray-700">Confirm new password
+                    <div class="relative mt-1">
+                        <input id="forgot-confirm-password" type="password" minlength="8" required class="w-full p-3 pr-12 border border-gray-300 rounded-lg" placeholder="Re-enter new password">
+                        <button type="button" data-password-toggle="forgot-confirm-password" data-password-label="password confirmation" class="absolute inset-y-0 right-0 px-4 text-gray-600" aria-label="Show password confirmation" title="Show password confirmation">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
+                </label>
+                <div id="forgot-password-reset-message" class="hidden rounded-lg p-3 text-sm" aria-live="polite"></div>
+                <button id="reset-forgot-password-button" type="submit" class="w-full rounded-lg bg-green-700 px-4 py-3 font-semibold text-white hover:bg-green-800">Set new password</button>
             </form>
         </div>
     </div>
