@@ -11,6 +11,8 @@ $endpoints = [
     'list_leaves.php' => 'list_leaves.php',
     'record_call.php' => 'record_call.php',
     'verify_pass.php' => 'verify_pass.php',
+    'gate_decision.php' => 'gate_decision.php',
+    'gate_history.php' => 'gate_history.php',
     'import_students.php' => 'import_students.php',
 ];
 

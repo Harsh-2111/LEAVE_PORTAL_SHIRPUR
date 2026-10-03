@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const securityPage = document.getElementById('security-page');
   const logoutModal = document.getElementById('logout-confirm-modal');
   const changePasswordModal = document.getElementById('change-password-modal');
-  const state = { csrfToken: '', user: null };
+  const state = { csrfToken: '', user: null, wardenApprovedHistory: [] };
   let loginProgressTimer = null;
   let securityQrScanner = null;
   let handlingSecurityScan = false;
@@ -628,9 +628,18 @@ document.addEventListener('DOMContentLoaded', () => {
           <h2 class="text-2xl font-semibold text-gray-700 mb-4">Pending Verification</h2>
           <div id="warden-pending-list" class="space-y-4"></div>
         </section>
+        <section class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm mt-6">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h2 class="text-2xl font-semibold text-gray-700">Approved Leave History</h2>
+            <button id="warden-download-approved-csv" type="button" disabled class="bg-green-700 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50">Download CSV</button>
+          </div>
+          <div id="warden-approved-history" class="overflow-x-auto" aria-live="polite"></div>
+        </section>
       </div>
     `;
     refreshPendingRequests();
+    loadWardenApprovedHistory();
+    document.getElementById('warden-download-approved-csv').addEventListener('click', downloadWardenApprovedCsv);
   }
 
   async function refreshPendingRequests() {
@@ -675,6 +684,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             if (!result.success) window.alert(result.message || 'Call result update failed.');
             await refreshPendingRequests();
+            await loadWardenApprovedHistory();
           } catch (error) {
             console.error(error);
             window.alert('Call result failed.');
@@ -685,6 +695,107 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error(error);
       target.innerHTML = '<p class="text-red-600">Unable to load pending requests.</p>';
     }
+  }
+
+  async function loadWardenApprovedHistory() {
+    const target = document.getElementById('warden-approved-history');
+    if (!target) return;
+    target.textContent = 'Loading approved leaves...';
+
+    try {
+      const items = [];
+      let page = 1;
+      let total = 0;
+      do {
+        const params = new URLSearchParams({ status: 'Granted', limit: '100', page: String(page) });
+        const response = await fetch(`/api/index.php?endpoint=list_leaves.php&${params.toString()}`);
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Unable to load approved leave history.');
+        const pageItems = result.items || [];
+        items.push(...pageItems);
+        total = Number(result.total) || 0;
+        if (!pageItems.length) break;
+        page += 1;
+      } while (items.length < total);
+
+      state.wardenApprovedHistory = items;
+      document.getElementById('warden-download-approved-csv').disabled = false;
+      if (!items.length) {
+        target.textContent = 'No approved leaves found for this hostel group.';
+        return;
+      }
+
+      const table = document.createElement('table');
+      table.className = 'min-w-full border border-gray-300 text-sm';
+      const columns = [
+        ['SAP ID', 'sap_id'], ['Student', 'name'], ['Dates', 'dates'], ['Days', 'leave_days'],
+        ['School / Hostel', 'location'], ['Reason', 'reason'], ['Approved on', 'granted_at']
+      ];
+      const head = document.createElement('thead');
+      head.className = 'bg-gray-100 text-gray-700';
+      const headerRow = document.createElement('tr');
+      columns.forEach(([label]) => {
+        const cell = document.createElement('th');
+        cell.className = 'px-3 py-2 text-left whitespace-nowrap';
+        cell.textContent = label;
+        headerRow.appendChild(cell);
+      });
+      head.appendChild(headerRow);
+      table.appendChild(head);
+
+      const body = document.createElement('tbody');
+      items.forEach(item => {
+        const row = document.createElement('tr');
+        row.className = 'border-t border-gray-200 align-top';
+        const values = {
+          sap_id: item.sap_id,
+          name: item.name,
+          dates: `${item.start_date} to ${item.end_date}`,
+          leave_days: item.leave_days,
+          location: `${item.school || '-'} / ${item.hostel || '-'}`,
+          reason: item.reason,
+          granted_at: item.granted_at
+        };
+        columns.forEach(([, key]) => {
+          const cell = document.createElement('td');
+          cell.className = 'px-3 py-2';
+          cell.textContent = values[key] ?? '-';
+          row.appendChild(cell);
+        });
+        body.appendChild(row);
+      });
+      table.appendChild(body);
+      target.replaceChildren(table);
+    } catch (error) {
+      console.error(error);
+      target.textContent = error.message || 'Unable to load approved leave history.';
+      target.className = 'overflow-x-auto text-sm text-red-600';
+    }
+  }
+
+  function downloadWardenApprovedCsv() {
+    const columns = [
+      ['SAP ID', 'sap_id'], ['Student Name', 'name'], ['Gender', 'gender'], ['Course', 'course'],
+      ['Year', 'year'], ['Branch', 'branch'], ['Batch', 'batch'], ['Start Date', 'start_date'],
+      ['End Date', 'end_date'], ['Leave Days', 'leave_days'], ['School', 'school'],
+      ['Hostel', 'hostel'], ['Reason', 'reason'], ['Approved At', 'granted_at']
+    ];
+    const csvCell = value => {
+      let text = String(value ?? '');
+      if (/^\s*[=+@-]/.test(text)) text = `'${text}`;
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+    const rows = [
+      columns.map(([label]) => csvCell(label)).join(','),
+      ...state.wardenApprovedHistory.map(item => columns.map(([, key]) => csvCell(item[key])).join(','))
+    ];
+    const blob = new Blob([`\uFEFF${rows.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `approved-leaves-${state.user?.warden_gender || 'hostel'}-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   function extractPassToken(decodedValue) {
@@ -707,20 +818,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const target = document.getElementById('security-result');
     if (!target) return;
     const card = document.createElement('section');
-    card.className = `mt-4 rounded-lg border-2 p-5 ${result.valid_qr ? 'border-green-500 bg-green-50' : 'border-amber-500 bg-amber-50'}`;
+    card.className = `mt-4 min-w-0 rounded-lg border-2 p-3 sm:p-5 ${result.valid_qr ? 'border-green-500 bg-green-50' : 'border-amber-500 bg-amber-50'}`;
 
     const heading = document.createElement('h3');
-    heading.className = 'text-2xl font-bold text-gray-900';
+    heading.className = 'break-words text-xl font-bold text-gray-900 sm:text-2xl';
     heading.textContent = result.student_name || 'Student pass';
     card.appendChild(heading);
 
     const badge = document.createElement('p');
-    badge.className = `mt-2 inline-flex rounded px-3 py-1 text-lg font-bold ${result.valid_qr ? 'bg-green-700 text-white' : 'bg-amber-600 text-white'}`;
+    badge.className = `mt-2 inline-flex max-w-full whitespace-normal break-words rounded px-3 py-1 text-sm font-bold sm:text-lg ${result.valid_qr ? 'bg-green-700 text-white' : 'bg-amber-600 text-white'}`;
     badge.textContent = result.valid_qr ? 'PASS VERIFIED' : 'PASS FOUND - QR SIGNATURE UNVERIFIED';
     card.appendChild(badge);
 
     const details = document.createElement('dl');
-    details.className = 'mt-4 grid gap-3 sm:grid-cols-2';
+    details.className = 'mt-4 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3';
     [
       ['SAP ID', result.sap_id],
       ['Status', result.status],
@@ -730,19 +841,116 @@ document.addEventListener('DOMContentLoaded', () => {
       ['Reason', result.reason]
     ].forEach(([label, value]) => {
       const row = document.createElement('div');
-      row.className = 'rounded border border-gray-200 bg-white p-3';
+      row.className = 'min-w-0 rounded border border-gray-200 bg-white p-3';
       const term = document.createElement('dt');
       term.className = 'text-xs font-semibold uppercase text-gray-500';
       term.textContent = label;
       const description = document.createElement('dd');
-      description.className = 'mt-1 break-words text-base font-semibold text-gray-900';
+      description.className = `mt-1 ${label === 'Pass token' ? 'break-all' : 'break-words'} text-sm font-semibold text-gray-900 sm:text-base`;
       description.textContent = value || 'Not provided';
       row.append(term, description);
       details.appendChild(row);
     });
     card.appendChild(details);
+
+    if (result.valid_qr && result.pass_token) {
+      const actions = document.createElement('div');
+      actions.className = 'mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2';
+      const acceptButton = document.createElement('button');
+      acceptButton.type = 'button';
+      acceptButton.className = 'w-full whitespace-normal rounded-lg bg-green-700 px-4 py-3 text-base font-bold text-white hover:bg-green-800';
+      acceptButton.textContent = 'Accept at gate';
+      acceptButton.addEventListener('click', () => submitGateDecision(result, 'accept', actions));
+      const rejectButton = document.createElement('button');
+      rejectButton.type = 'button';
+      rejectButton.className = 'w-full whitespace-normal rounded-lg bg-red-700 px-4 py-3 text-base font-bold text-white hover:bg-red-800';
+      rejectButton.textContent = 'Reject pass';
+      rejectButton.addEventListener('click', () => submitGateDecision(result, 'reject', actions));
+      actions.append(acceptButton, rejectButton);
+      card.appendChild(actions);
+    }
+
     target.replaceChildren(card);
     target.classList.remove('hidden');
+  }
+
+  async function submitGateDecision(pass, decision, actionContainer) {
+    const buttons = actionContainer.querySelectorAll('button');
+    buttons.forEach(button => { button.disabled = true; });
+    try {
+      const response = await fetch('/api/index.php?endpoint=gate_decision.php', {
+        method: 'POST',
+        body: getCsrfFormData({
+          leave_id: String(pass.leave_id),
+          pass_token: pass.pass_token,
+          decision
+        })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || 'Unable to record the gate decision.');
+      const outcome = document.createElement('p');
+      outcome.className = `mt-4 rounded-lg p-3 text-center text-lg font-bold ${decision === 'accept' ? 'bg-green-700 text-white' : 'bg-red-700 text-white'}`;
+      outcome.textContent = result.message;
+      actionContainer.replaceWith(outcome);
+      await loadGateDecisionHistory();
+    } catch (error) {
+      console.error(error);
+      const target = document.getElementById('security-result');
+      showMessage(target, error.message || 'Unable to record the gate decision.', 'error');
+    }
+  }
+
+  async function loadGateDecisionHistory() {
+    const target = document.getElementById('security-gate-history');
+    if (!target) return;
+    try {
+      const response = await fetch('/api/index.php?endpoint=gate_history.php');
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || 'Unable to load gate history.');
+      const items = result.items || [];
+      if (!items.length) {
+        target.textContent = 'No gate decisions recorded yet.';
+        return;
+      }
+      const table = document.createElement('table');
+      table.className = 'min-w-full border border-gray-300 text-sm';
+      const headings = ['Student', 'SAP ID', 'Decision', 'Leave dates', 'Checked at'];
+      const thead = document.createElement('thead');
+      thead.className = 'bg-gray-100 text-gray-700';
+      const headingRow = document.createElement('tr');
+      headings.forEach(label => {
+        const cell = document.createElement('th');
+        cell.className = 'whitespace-nowrap px-3 py-2 text-left';
+        cell.textContent = label;
+        headingRow.appendChild(cell);
+      });
+      thead.appendChild(headingRow);
+      table.appendChild(thead);
+      const tbody = document.createElement('tbody');
+      items.forEach(item => {
+        const row = document.createElement('tr');
+        row.className = 'border-t border-gray-200';
+        [
+          item.student_name,
+          item.sap_id,
+          item.action === 'gate_pass_accepted' ? 'Accepted' : 'Rejected',
+          `${item.start_date} to ${item.end_date}`,
+          item.created_at
+        ].forEach(value => {
+          const cell = document.createElement('td');
+          cell.className = 'px-3 py-2';
+          cell.textContent = value || '-';
+          row.appendChild(cell);
+        });
+        tbody.appendChild(row);
+      });
+      table.appendChild(tbody);
+      target.replaceChildren(table);
+    } catch (error) {
+      console.error(error);
+      target.textContent = error.message || 'Unable to load gate history.';
+      target.className = 'overflow-x-auto text-sm text-red-600';
+    }
   }
 
   async function verifySecurityPass({ sapId = '', token = '' } = {}) {
@@ -755,7 +963,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const response = await fetch(`/api/index.php?endpoint=verify_pass.php&${params.toString()}`);
       const result = await response.json();
       if (!response.ok || !result.success) {
-        showMessage(target, result.message || 'Pass verification failed.', 'error');
+        const failureMessage = token && response.status === 404
+          ? 'Invalid QR: no approved leave pass matches this code.'
+          : result.message || 'Pass verification failed.';
+        showMessage(target, failureMessage, 'error');
+        return;
+      }
+      if (token && !result.valid_qr) {
+        showMessage(target, 'Invalid QR: this code is not a signed leave pass.', 'error');
         return;
       }
       renderSecurityResult(result);
@@ -791,7 +1006,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     await stopSecurityScanner();
     reader.classList.remove('hidden');
-    const scanner = new window.Html5Qrcode('security-qr-reader');
+    const scanner = new window.Html5Qrcode('security-qr-reader', {
+      verbose: false,
+      formatsToSupport: [window.Html5QrcodeSupportedFormats.QR_CODE],
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+    });
     securityQrScanner = scanner;
     const scanButton = document.getElementById('security-scan-button');
     const stopButton = document.getElementById('security-stop-scan-button');
@@ -802,7 +1021,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const boxSize = Math.min(280, Math.max(180, Math.floor(reader.clientWidth * 0.8)));
       await scanner.start(
         { facingMode: 'environment' },
-        { fps: 12, qrbox: { width: boxSize, height: boxSize }, aspectRatio: 1 },
+        { fps: 20, qrbox: { width: boxSize, height: boxSize }, aspectRatio: 1 },
         async decodedText => {
           if (handlingSecurityScan) return;
           handlingSecurityScan = true;
@@ -812,7 +1031,7 @@ document.addEventListener('DOMContentLoaded', () => {
           stopButton.classList.add('hidden');
           scanButton.disabled = false;
           if (!token) {
-            showMessage(result, 'This QR code does not contain a recognized hostel pass token.', 'error');
+            showMessage(result, 'Invalid QR: this code is not a designated hostel leave pass.', 'error');
           } else {
             await verifySecurityPass({ token });
           }
@@ -853,6 +1072,10 @@ document.addEventListener('DOMContentLoaded', () => {
           <div id="security-qr-reader" class="hidden mt-5 w-full max-w-md mx-auto overflow-hidden rounded-lg"></div>
           <div id="security-result" class="mt-4 hidden" aria-live="polite"></div>
         </section>
+        <section class="mt-6 bg-white rounded-xl p-4 sm:p-5 border border-gray-200 shadow-sm">
+          <h2 class="text-xl font-semibold text-gray-700 mb-4 sm:text-2xl">Gate Decision History</h2>
+          <div id="security-gate-history" class="overflow-x-auto text-sm" aria-live="polite">Loading gate history...</div>
+        </section>
       </div>
     `;
     document.getElementById('verify-pass-btn').addEventListener('click', async () => {
@@ -871,6 +1094,7 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('security-stop-scan-button').classList.add('hidden');
       document.getElementById('security-scan-button').disabled = false;
     });
+    loadGateDecisionHistory();
   }
 
   function showAdminPage() {
