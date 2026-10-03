@@ -41,6 +41,100 @@ body {
     min-width: 0;
 }
 
+#app-container.login-shell {
+    width: min(100%, 1180px);
+    max-width: 1180px !important;
+    padding: 0;
+    overflow: hidden;
+    background: #fff;
+    border-color: rgba(255, 255, 255, 0.7);
+}
+
+#landing-page {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(340px, 0.9fr);
+    min-height: min(84vh, 760px);
+    background: #fff;
+}
+
+#landing-page.hidden {
+    display: none;
+}
+
+#landing-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 3rem;
+    min-width: 0;
+    padding: 3rem;
+    color: #fff;
+    background: rgba(43, 45, 47, 0.76);
+}
+
+.landing-eyebrow {
+    margin: 0 0 1rem;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0;
+}
+
+#landing-title {
+    max-width: 620px;
+    margin: 0;
+    color: #fff;
+    font-size: 2.25rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.landing-description {
+    max-width: 580px;
+    margin: 1.5rem 0 0;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1.05rem;
+    line-height: 1.7;
+}
+
+.landing-contact {
+    padding-top: 1.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.48);
+}
+
+.landing-contact a {
+    color: #bfdbfe;
+    font-size: 1rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+#login-panel {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    padding: 2.25rem;
+    color: #1f2937;
+    background: #fff;
+}
+
+#login-section {
+    text-align: left;
+}
+
+#login-section > h1 {
+    margin-bottom: 1.75rem;
+    font-size: 1.8rem;
+    line-height: 1.2;
+}
+
+#student-forgot-password-button {
+    display: block;
+    width: 100%;
+    text-align: right;
+}
+
 input[type="text"],
 input[type="password"],
 input[type="email"],
@@ -103,6 +197,33 @@ button {
         border-radius: 0.9rem;
     }
 
+    #app-container.login-shell {
+        padding: 0;
+    }
+
+    #landing-page {
+        grid-template-columns: minmax(0, 1fr);
+        min-height: 0;
+    }
+
+    #landing-info {
+        gap: 2rem;
+        padding: 1.75rem;
+    }
+
+    #landing-title {
+        font-size: 1.8rem;
+    }
+
+    .landing-description {
+        margin-top: 1rem;
+        font-size: 1rem;
+    }
+
+    #login-panel {
+        padding: 1.75rem;
+    }
+
     button,
     input,
     select,
@@ -141,6 +262,15 @@ button {
 
     #app-container {
         padding: 0.8rem;
+    }
+
+    #app-container.login-shell {
+        padding: 0;
+    }
+
+    #landing-info,
+    #login-panel {
+        padding: 1.25rem;
     }
 
     h1 {

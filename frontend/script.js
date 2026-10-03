@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const appContainer = document.getElementById('app-container');
   const loginForm = document.getElementById('login-section');
   const loginSection = document.getElementById('login-section');
+  const landingPage = document.getElementById('landing-page');
   const loginMessage = document.getElementById('message-box');
   const studentPage = document.getElementById('student-page');
   const wardenPage = document.getElementById('teacher-page');
@@ -219,6 +220,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function hideAllPages() {
+    appContainer.classList.remove('login-shell');
+    landingPage.classList.add('hidden');
     loginSection.classList.add('hidden');
     studentPage.classList.add('hidden');
     wardenPage.classList.add('hidden');
@@ -229,10 +232,12 @@ document.addEventListener('DOMContentLoaded', () => {
   function showLogin() {
     hideAllPages();
     appContainer.classList.remove('portal-wide');
+    appContainer.classList.add('login-shell');
     studentPage.replaceChildren();
     wardenPage.replaceChildren();
     adminPage.replaceChildren();
     securityPage.replaceChildren();
+    landingPage.classList.remove('hidden');
     loginSection.classList.remove('hidden');
     document.getElementById('user-id').value = '';
     document.getElementById('password').value = '';
@@ -940,8 +945,14 @@ document.addEventListener('DOMContentLoaded', () => {
     card.appendChild(heading);
 
     const badge = document.createElement('p');
-    badge.className = `mt-2 inline-flex max-w-full whitespace-normal break-words rounded px-3 py-1 text-sm font-bold sm:text-lg ${result.valid_qr ? 'bg-green-700 text-white' : 'bg-amber-600 text-white'}`;
-    badge.textContent = result.valid_qr ? 'PASS VERIFIED' : 'PASS FOUND - QR SIGNATURE UNVERIFIED';
+    const hasGateDecision = ['accept', 'reject'].includes(result.gate_decision);
+    const badgeColor = hasGateDecision && result.gate_decision === 'reject'
+      ? 'bg-red-700 text-white'
+      : result.valid_qr ? 'bg-green-700 text-white' : 'bg-amber-600 text-white';
+    badge.className = `mt-2 inline-flex max-w-full whitespace-normal break-words rounded px-3 py-1 text-sm font-bold sm:text-lg ${badgeColor}`;
+    badge.textContent = hasGateDecision
+      ? result.gate_decision === 'accept' ? 'ALREADY ACCEPTED AT GATE' : 'ALREADY REJECTED AT GATE'
+      : result.valid_qr ? 'PASS VERIFIED' : 'PASS FOUND - QR SIGNATURE UNVERIFIED';
     card.appendChild(badge);
 
     const details = document.createElement('dl');
@@ -952,6 +963,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ['Valid from', result.start_date],
       ['Valid until', result.end_date],
       ['Pass token', result.pass_token],
+      ['Gate decision', hasGateDecision ? (result.gate_decision === 'accept' ? 'Accepted' : 'Rejected') : 'Not decided'],
       ['Reason', result.reason]
     ].forEach(([label, value]) => {
       const row = document.createElement('div');
@@ -967,7 +979,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     card.appendChild(details);
 
-    if (result.valid_qr && result.pass_token) {
+    if (result.valid_qr && result.pass_token && !hasGateDecision) {
       const actions = document.createElement('div');
       actions.className = 'mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2';
       const acceptButton = document.createElement('button');
@@ -1002,8 +1014,9 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.message || 'Unable to record the gate decision.');
+      const savedDecision = result.decision;
       const outcome = document.createElement('p');
-      outcome.className = `mt-4 rounded-lg p-3 text-center text-lg font-bold ${decision === 'accept' ? 'bg-green-700 text-white' : 'bg-red-700 text-white'}`;
+      outcome.className = `mt-4 rounded-lg p-3 text-center text-lg font-bold ${savedDecision === 'accept' ? 'bg-green-700 text-white' : 'bg-red-700 text-white'}`;
       outcome.textContent = result.message;
       actionContainer.replaceWith(outcome);
       await loadGateDecisionHistory();

@@ -4,5 +4,8 @@
     { "src": "api/index.php", "use": "vercel-php@0.9.0" },
     { "src": "*.html", "use": "@vercel/static" },
     { "src": "frontend/**", "use": "@vercel/static" }
+  ],
+  "crons": [
+    { "path": "/api/index.php?endpoint=cleanup_history.php", "schedule": "0 0 1 1,3,5,7,9,11 *" }
   ]
 }

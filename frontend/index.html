@@ -13,7 +13,21 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body class="font-inter bg-gray-100 min-h-screen flex items-center justify-center p-4">
-    <div id="app-container" class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+    <div id="app-container" class="login-shell bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+        <div id="landing-page" class="landing-layout">
+            <section id="landing-info" aria-labelledby="landing-title">
+                <div>
+                    <p class="landing-eyebrow">SVKM'S NMIMS · SHIRPUR</p>
+                    <h1 id="landing-title">Welcome to NMIMS Shirpur Hostel Leave Portal</h1>
+                    <p class="landing-description">Hostel leave requests and gate-pass verification for the NMIMS Shirpur community.</p>
+                </div>
+                <div class="landing-contact">
+                    <p class="landing-eyebrow">OFFICIAL HOSTEL EMAIL</p>
+                    <a href="mailto:exchangeshirpur@nmims.edu">exchangeshirpur@nmims.edu</a>
+                </div>
+            </section>
+
+            <section id="login-panel" aria-label="Portal sign in">
         <form id="login-section" class="text-center">
             <h1 class="text-3xl font-bold text-gray-800 mb-6">Login to Your Portal</h1>
             
@@ -58,6 +72,9 @@
         </form>
         
         <div id="message-box" class="mt-4 p-3 rounded-lg text-sm hidden"></div>
+            </section>
+        </div>
+
         <div id="student-page" class="hidden">
             <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Welcome to Nmims Leave Application🧳!</h1>
             <h2 class="text-2xl font-semibold text-gray-700 mb-4">Enter your Sap ID to get your Gate Pass,When Mentor accept your request</h2>

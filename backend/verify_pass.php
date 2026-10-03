@@ -72,6 +72,17 @@ if ($qrCodeData !== '') {
     }
 }
 
+$gateDecisionStmt = $pdo->prepare(
+    'SELECT a.action FROM audit_log a INNER JOIN users u ON u.id = a.user_id '
+    . 'WHERE a.entity = ? AND a.entity_id = ? AND a.action IN (?, ?) AND u.role = ? '
+    . 'ORDER BY a.created_at DESC, a.id DESC LIMIT 1'
+);
+$gateDecisionStmt->execute(['leave_requests', (int)$record['id'], 'gate_pass_accepted', 'gate_pass_rejected', 'security']);
+$gateDecisionRow = $gateDecisionStmt->fetch();
+$gateDecision = $gateDecisionRow
+    ? ($gateDecisionRow['action'] === 'gate_pass_accepted' ? 'accept' : 'reject')
+    : null;
+
 $payload = [
     'success' => true,
     'leave_id' => (int)$record['id'],
@@ -80,6 +91,7 @@ $payload = [
     'status' => $record['status'],
     'pass_token' => $record['pass_token'],
     'valid_qr' => $validQr,
+    'gate_decision' => $gateDecision,
     'start_date' => $record['start_date'],
     'end_date' => $record['end_date'],
     'reason' => $record['reason'],

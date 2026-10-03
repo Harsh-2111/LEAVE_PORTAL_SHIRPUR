@@ -66,8 +66,11 @@ The application supports both local MySQL and Supabase PostgreSQL. Docker keeps 
 | `QR_HMAC_SECRET` | A unique, long random value |
 | `HOSTEL_EMAIL` | Your hostel contact email |
 | `APP_ENV` | `production` |
+| `CRON_SECRET` | A long random value used to authorize scheduled history cleanup |
 
 5. Redeploy the latest commit. The PHP client uses emulated prepares for the Supabase transaction pooler and requires SSL. The browser calls the API through `/api/index.php?endpoint=...`; root-level PHP URLs are not function routes.
+
+Vercel runs the protected leave-history cleanup at 00:00 UTC on the first day of January, March, May, July, September, and November. It removes previous-period leave requests and related call/audit history in one database transaction. Set `CRON_SECRET` in Vercel so only the scheduled job can run it.
 
 Do not use the direct database host if it is unreachable from Vercel, and do not use any placeholder values from `.env.example` as production credentials. Keep database passwords and QR secrets in Vercel, not in Git or chat. Local Docker continues using MySQL by default; set `DB_DRIVER=mysql` there.
 
