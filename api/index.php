@@ -4,6 +4,7 @@ header('Cache-Control: no-store');
 $endpoints = [
     'login.php' => 'login.php',
     'logout.php' => 'logout.php',
+    'session.php' => 'session.php',
     'forgot_password.php' => 'forgot_password.php',
     'change_password.php' => 'change_password.php',
     'student_lookup.php' => 'student_lookup.php',

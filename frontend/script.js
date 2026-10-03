@@ -253,6 +253,31 @@ document.addEventListener('DOMContentLoaded', () => {
     return formData;
   }
 
+  async function showAuthenticatedPortal() {
+    if (state.user?.role === 'student') await showStudentPage();
+    else if (state.user?.role === 'warden') showWardenPage();
+    else if (state.user?.role === 'admin') showAdminPage();
+    else if (state.user?.role === 'security') showSecurityPage();
+  }
+
+  async function restoreSession() {
+    appContainer.classList.add('auth-checking');
+    try {
+      const response = await fetch('/api/index.php?endpoint=session.php', { cache: 'no-store' });
+      if (!response.ok) return;
+      const result = await response.json();
+      if (!result.success || !result.user) return;
+
+      state.user = result.user;
+      state.csrfToken = result.csrf_token || '';
+      await showAuthenticatedPortal();
+    } catch (error) {
+      console.warn('Unable to restore the current session.', error);
+    } finally {
+      appContainer.classList.remove('auth-checking');
+    }
+  }
+
   async function handleLogin() {
     const loginId = document.getElementById('user-id').value.trim();
     const password = document.getElementById('password').value;
@@ -284,10 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
       hideMessage(loginMessage);
       setTimeout(async () => {
         resetLoginProgress();
-        if (state.user.role === 'student') await showStudentPage();
-        else if (state.user.role === 'warden') showWardenPage();
-        else if (state.user.role === 'admin') showAdminPage();
-        else if (state.user.role === 'security') showSecurityPage();
+        await showAuthenticatedPortal();
       }, 350);
     } catch (error) {
       console.error(error);
@@ -1316,4 +1338,5 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cancel-logout').addEventListener('click', () => logoutModal.classList.add('hidden'));
   updateRoleTitle();
   showLogin();
+  restoreSession();
 });
