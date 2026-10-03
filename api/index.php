@@ -25,4 +25,4 @@ if (!isset($endpoints[$endpoint])) {
 }
 
 unset($_GET['endpoint']);
-require dirname(__DIR__) . '/' . $endpoints[$endpoint];
+require dirname(__DIR__) . '/backend/' . $endpoints[$endpoint];

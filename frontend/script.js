@@ -1006,6 +1006,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     await stopSecurityScanner();
     reader.classList.remove('hidden');
+    reader.style.display = 'block';
+    reader.style.width = '100%';
+    reader.style.minHeight = '280px';
+    await new Promise(resolve => requestAnimationFrame(resolve));
     const scanner = new window.Html5Qrcode('security-qr-reader', {
       verbose: false,
       formatsToSupport: [window.Html5QrcodeSupportedFormats.QR_CODE],
@@ -1018,7 +1022,8 @@ document.addEventListener('DOMContentLoaded', () => {
     stopButton.classList.remove('hidden');
 
     try {
-      const boxSize = Math.min(280, Math.max(180, Math.floor(reader.clientWidth * 0.8)));
+      const availableSize = Math.min(reader.clientWidth || window.innerWidth - 48, window.innerHeight * 0.55);
+      const boxSize = Math.min(300, Math.max(180, Math.floor(availableSize * 0.78)));
       await scanner.start(
         { facingMode: 'environment' },
         { fps: 20, qrbox: { width: boxSize, height: boxSize }, aspectRatio: 1 },
@@ -1028,6 +1033,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const token = extractPassToken(decodedText);
           await stopSecurityScanner();
           reader.classList.add('hidden');
+          reader.style.display = 'none';
           stopButton.classList.add('hidden');
           scanButton.disabled = false;
           if (!token) {
@@ -1038,10 +1044,12 @@ document.addEventListener('DOMContentLoaded', () => {
           handlingSecurityScan = false;
         }
       );
+      reader.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } catch (error) {
       console.error(error);
       await stopSecurityScanner();
       reader.classList.add('hidden');
+      reader.style.display = 'none';
       stopButton.classList.add('hidden');
       scanButton.disabled = false;
       showMessage(result, 'Could not open the camera. Allow camera access in your browser and try again.', 'error');
@@ -1090,7 +1098,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('security-scan-button').addEventListener('click', startSecurityScanner);
     document.getElementById('security-stop-scan-button').addEventListener('click', async () => {
       await stopSecurityScanner();
-      document.getElementById('security-qr-reader').classList.add('hidden');
+      const reader = document.getElementById('security-qr-reader');
+      reader.classList.add('hidden');
+      reader.style.display = 'none';
       document.getElementById('security-stop-scan-button').classList.add('hidden');
       document.getElementById('security-scan-button').disabled = false;
     });
@@ -1109,7 +1119,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <section class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
           <h2 class="text-2xl font-semibold text-gray-700 mb-4">Import Students CSV</h2>
-          <p class="text-sm text-gray-600 mb-3"><a href="student_template.csv" class="text-blue-600 underline">Student CSV template</a></p>
+          <p class="text-sm text-gray-600 mb-3"><a href="/frontend/student_template.csv" class="text-blue-600 underline">Student CSV template</a></p>
           <form id="student-import-form" enctype="multipart/form-data">
             <input type="file" name="students_csv" accept=".csv" required class="block w-full text-sm text-gray-500" />
             <button type="submit" class="mt-4 bg-green-600 text-white px-5 py-3 rounded-lg font-semibold">Import Students</button>

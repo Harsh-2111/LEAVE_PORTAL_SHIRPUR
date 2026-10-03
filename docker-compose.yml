@@ -39,9 +39,9 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./hostel_leave_schema_v2.sql:/docker-entrypoint-initdb.d/01_hostel_leave_schema_v2.sql:ro
-      - ./dev_seed.sql:/docker-entrypoint-initdb.d/02_dev_seed.sql:ro
-      - ./hostel_leave_migration_v3.sql:/docker-entrypoint-initdb.d/03_hostel_leave_migration_v3.sql:ro
+      - ./database/hostel_leave_schema_v2.sql:/docker-entrypoint-initdb.d/01_hostel_leave_schema_v2.sql:ro
+      - ./database/dev_seed.sql:/docker-entrypoint-initdb.d/02_dev_seed.sql:ro
+      - ./database/hostel_leave_migration_v3.sql:/docker-entrypoint-initdb.d/03_hostel_leave_migration_v3.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
       interval: 10s

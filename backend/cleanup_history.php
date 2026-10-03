@@ -1,6 +1,6 @@
 <?php
 // cleanup_history.php - MODIFIED for Annual Student Cycle (June 1st)
-require_once 'db.php';
+require_once __DIR__ . '/db.php';
 
 // --- Logic to determine the start of the current academic cycle (June 1st) ---
 $today = date('Y-m-d');
@@ -13,7 +13,7 @@ if ($today < $cleanup_cycle_start) {
     $cleanup_cycle_start = (date('Y') - 1) . '-06-01';
 }
 
-$marker_file = 'cleanup_marker.txt';
+$marker_file = __DIR__ . '/cleanup_marker.txt';
 $last_cleanup_date = '1970-01-01';
 
 // 1. Check marker file to see when the script last ran

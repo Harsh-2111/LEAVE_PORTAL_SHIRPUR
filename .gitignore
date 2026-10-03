@@ -7,7 +7,7 @@ __pycache__/
 # Uploaded files
 uploads/
 *.csv
-!student_template.csv
+!frontend/student_template.csv
 
 # Logs
 logs/

@@ -3,9 +3,6 @@
   "builds": [
     { "src": "api/index.php", "use": "vercel-php@0.9.0" },
     { "src": "*.html", "use": "@vercel/static" },
-    { "src": "*.js", "use": "@vercel/static" },
-    { "src": "*.css", "use": "@vercel/static" },
-    { "src": "*.png", "use": "@vercel/static" },
-    { "src": "*.csv", "use": "@vercel/static" }
+    { "src": "frontend/**", "use": "@vercel/static" }
   ]
 }

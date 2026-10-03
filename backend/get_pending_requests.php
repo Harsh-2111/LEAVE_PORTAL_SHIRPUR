@@ -1,6 +1,6 @@
 <?php
 // get_pending_requests.php - Faculty 1-Month History View
-require_once 'db.php';
+require_once __DIR__ . '/db.php';
 
 $role = $_GET['role'] ?? '';
 $name = $_GET['name'] ?? '';

@@ -79,6 +79,19 @@ button {
     overflow-wrap: anywhere;
 }
 
+#security-qr-reader:not(.hidden) {
+    min-height: 280px;
+    width: 100%;
+    background: #111827;
+}
+
+#security-qr-reader video {
+    display: block !important;
+    width: 100% !important;
+    max-height: 55vh;
+    object-fit: cover;
+}
+
 /* Responsive support for mobile and tablet layouts */
 @media (max-width: 768px) {
     body {

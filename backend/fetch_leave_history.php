@@ -1,6 +1,6 @@
 <?php
 // fetch_leave_history.php
-require_once 'db.php';
+require_once __DIR__ . '/db.php';
 
 $student_id = $_GET['student_id'] ?? '';
 if (!$student_id) {
