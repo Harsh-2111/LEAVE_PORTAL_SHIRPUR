@@ -41,10 +41,6 @@ body {
     min-width: 0;
 }
 
-#app-container.auth-checking {
-    visibility: hidden;
-}
-
 #app-container.login-shell {
     width: min(100%, 1180px);
     max-width: 1180px !important;

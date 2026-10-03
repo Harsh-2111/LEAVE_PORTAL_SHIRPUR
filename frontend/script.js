@@ -261,7 +261,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function restoreSession() {
-    appContainer.classList.add('auth-checking');
     try {
       const response = await fetch('/api/index.php?endpoint=session.php', { cache: 'no-store' });
       if (!response.ok) return;
@@ -273,8 +272,6 @@ document.addEventListener('DOMContentLoaded', () => {
       await showAuthenticatedPortal();
     } catch (error) {
       console.warn('Unable to restore the current session.', error);
-    } finally {
-      appContainer.classList.remove('auth-checking');
     }
   }
 
