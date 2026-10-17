@@ -186,6 +186,75 @@ button {
     object-fit: cover;
 }
 
+.gate-attendance-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.gate-attendance-controls input,
+.gate-attendance-controls select {
+    min-height: 2.75rem;
+}
+
+.gate-export-button {
+    border: 0;
+    border-radius: 0.5rem;
+    padding: 0.7rem 1rem;
+    color: #fff;
+    font-weight: 600;
+    transition: filter 0.15s ease-in-out;
+}
+
+.gate-export-button:hover {
+    filter: brightness(0.92);
+}
+
+.gate-export-departures {
+    background: #1d4ed8;
+}
+
+.gate-export-arrivals {
+    background: #0e7490;
+}
+
+.gate-status-badge {
+    display: inline-flex;
+    max-width: 18rem;
+    align-items: center;
+    white-space: normal;
+    border-radius: 9999px;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.gate-status-late {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.gate-status-early {
+    background: #cffafe;
+    color: #155e75;
+}
+
+.gate-status-on-time {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.gate-status-outside {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.gate-status-pending {
+    background: #e5e7eb;
+    color: #374151;
+}
+
 /* Responsive support for mobile and tablet layouts */
 @media (max-width: 768px) {
     body {

@@ -34,8 +34,19 @@ if ($user['role'] === 'student' && $leave['sap_id'] !== $user['login_id']) {
     exit;
 }
 
-$update = $pdo->prepare('UPDATE leave_requests SET status = \'Cancelled\' WHERE id = ?');
+if ($leave['gate_out_time'] !== null || in_array($leave['status'], ['CHECKED_OUT', 'CHECKED_IN'], true)) {
+    http_response_code(409);
+    echo json_encode(['success' => false, 'message' => 'A leave request cannot be cancelled after a gate exit has been recorded.']);
+    exit;
+}
+
+$update = $pdo->prepare('UPDATE leave_requests SET status = \'Cancelled\' WHERE id = ? AND gate_out_time IS NULL AND status NOT IN (\'CHECKED_OUT\', \'CHECKED_IN\')');
 $update->execute([$leaveId]);
+if ($update->rowCount() !== 1) {
+    http_response_code(409);
+    echo json_encode(['success' => false, 'message' => 'This leave request can no longer be cancelled.']);
+    exit;
+}
 
 writeAudit($pdo, (int)$user['id'], 'cancel_leave', 'leave_requests', $leaveId, ['status' => 'Cancelled'], $_SERVER['REMOTE_ADDR'] ?? null);
 

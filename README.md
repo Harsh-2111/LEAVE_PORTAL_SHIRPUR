@@ -105,6 +105,14 @@ Get-Content -Raw .\database\hostel_leave_migration_v3.sql | docker compose exec 
 
 This migration preserves existing requests and adds the new profile and warden-group fields. Existing non-demo student records need their new profile values populated through the updated CSV import before those students can submit requests.
 
+Apply the additive gate attendance migration to an existing MySQL volume:
+
+```powershell
+Get-Content -Raw .\database\hostel_leave_migration_v4.sql | docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" hostel_leave'
+```
+
+For an existing Supabase database, run `database/hostel_leave_migration_v4_postgres.sql` in the Supabase SQL Editor. New installations receive the gate columns and status values from the corresponding schema file.
+
 ## Production checklist
 
 - Use HTTPS in front of the app

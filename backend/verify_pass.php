@@ -21,7 +21,7 @@ if ($sapId === '' && $token === '') {
     exit;
 }
 
-$sql = 'SELECT lr.id, lr.sap_id, s.name AS student_name, s.gender, lr.status, lr.pass_token, lr.qr_code_data, lr.start_date, lr.end_date, lr.reason FROM leave_requests lr INNER JOIN students s ON s.sap_id = lr.sap_id WHERE lr.status = \'Granted\' AND lr.pass_token IS NOT NULL';
+$sql = 'SELECT lr.id, lr.sap_id, s.name AS student_name, s.gender, lr.status, lr.pass_token, lr.qr_code_data, lr.start_date, lr.end_date, lr.reason, lr.gate_out_time, lr.gate_in_time, lr.return_timing_status, lr.variance_summary FROM leave_requests lr INNER JOIN students s ON s.sap_id = lr.sap_id WHERE lr.status IN (\'Granted\', \'CHECKED_OUT\', \'CHECKED_IN\') AND lr.pass_token IS NOT NULL';
 $params = [];
 
 if ($user['role'] === 'warden') {
@@ -95,6 +95,10 @@ $payload = [
     'start_date' => $record['start_date'],
     'end_date' => $record['end_date'],
     'reason' => $record['reason'],
+    'gate_out_time' => $record['gate_out_time'],
+    'gate_in_time' => $record['gate_in_time'],
+    'return_timing_status' => $record['return_timing_status'],
+    'variance_summary' => $record['variance_summary'],
 ];
 
 echo json_encode($payload);

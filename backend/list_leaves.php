@@ -44,8 +44,13 @@ if ($sapId !== '') {
 }
 
 if ($status !== '') {
-    $where[] = 'lr.status = ?';
-    $params[] = $status;
+    if ($status === 'Granted' && $user['role'] === 'warden') {
+        $where[] = 'lr.status IN (?, ?, ?)';
+        array_push($params, 'Granted', 'CHECKED_OUT', 'CHECKED_IN');
+    } else {
+        $where[] = 'lr.status = ?';
+        $params[] = $status;
+    }
 }
 
 if ($startDate !== '') {

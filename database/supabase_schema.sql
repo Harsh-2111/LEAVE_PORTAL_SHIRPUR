@@ -49,9 +49,14 @@ CREATE TABLE IF NOT EXISTS public.leave_requests (
   parent_email_matched BOOLEAN NOT NULL DEFAULT FALSE,
   logged_by BIGINT NOT NULL REFERENCES public.users (id) ON UPDATE CASCADE,
   status VARCHAR(30) NOT NULL DEFAULT 'Pending Verification'
-    CHECK (status IN ('Pending Verification', 'Granted', 'Rejected', 'Cancelled')),
+    CHECK (status IN ('Pending Verification', 'Granted', 'Rejected', 'Cancelled', 'CHECKED_OUT', 'CHECKED_IN')),
   pass_token CHAR(64) UNIQUE,
   qr_code_data TEXT,
+  gate_out_time TIMESTAMPTZ,
+  gate_in_time TIMESTAMPTZ,
+  return_timing_status VARCHAR(20) NOT NULL DEFAULT 'PENDING_EXIT'
+    CHECK (return_timing_status IN ('PENDING_EXIT', 'OUTSIDE', 'ON_TIME', 'EARLY_RETURN', 'LATE_RETURN')),
+  variance_summary VARCHAR(100),
   granted_by BIGINT REFERENCES public.users (id) ON UPDATE CASCADE,
   granted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

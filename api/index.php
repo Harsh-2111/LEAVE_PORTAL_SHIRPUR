@@ -15,6 +15,8 @@ $endpoints = [
     'verify_pass.php' => 'verify_pass.php',
     'gate_decision.php' => 'gate_decision.php',
     'gate_history.php' => 'gate_history.php',
+    'get_warden_gate_logs.php' => 'get_warden_gate_logs.php',
+    'export_gate_attendance.php' => 'export_gate_attendance.php',
     'cleanup_history.php' => 'cleanup_history.php',
     'import_students.php' => 'import_students.php',
 ];

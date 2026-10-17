@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const forgotPasswordModal = document.getElementById('forgot-password-modal');
   const state = { csrfToken: '', user: null, wardenApprovedHistory: [], forgotResetToken: '', forgotCsrfToken: '' };
   let loginProgressTimer = null;
+  let wardenAttendanceTimer = null;
   let securityQrScanner = null;
   let handlingSecurityScan = false;
 
@@ -317,6 +318,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function logoutUser() {
     await stopSecurityScanner();
+    if (wardenAttendanceTimer !== null) {
+      clearInterval(wardenAttendanceTimer);
+      wardenAttendanceTimer = null;
+    }
     try {
       await fetch('/api/index.php?endpoint=logout.php', { method: 'POST', body: getCsrfFormData() });
     } catch (error) {
@@ -767,6 +772,24 @@ document.addEventListener('DOMContentLoaded', () => {
           <div id="warden-pending-list" class="space-y-4"></div>
         </section>
         <section class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm mt-6">
+          <h2 class="text-2xl font-semibold text-gray-700 mb-4">Daily Gate Attendance</h2>
+          <div class="gate-attendance-controls mb-4">
+            <label for="attendanceDate" class="text-sm font-semibold text-gray-700">Attendance date</label>
+            <input id="attendanceDate" type="date" class="rounded-lg border border-gray-300 px-3 py-2" />
+            <label for="gateAttendanceFilter" class="text-sm font-semibold text-gray-700">Show</label>
+            <select id="gateAttendanceFilter" class="rounded-lg border border-gray-300 px-3 py-2">
+              <option value="all">All gate activity</option>
+              <option value="outside">Currently outside</option>
+              <option value="exited_today">Exited on date</option>
+              <option value="entered_today">Entered on date</option>
+              <option value="defaulters">Overdue defaulters</option>
+            </select>
+            <button id="download-gate-departures" type="button" class="gate-export-button gate-export-departures">📥 Download Gate Departures (Left)</button>
+            <button id="download-gate-arrivals" type="button" class="gate-export-button gate-export-arrivals">📥 Download Gate Arrivals (Entered)</button>
+          </div>
+          <div id="warden-gate-attendance" class="overflow-x-auto" aria-live="polite">Loading gate attendance...</div>
+        </section>
+        <section class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm mt-6">
           <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
             <h2 class="text-2xl font-semibold text-gray-700">Approved Leave History</h2>
             <button id="warden-download-approved-csv" type="button" disabled class="bg-green-700 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50">Download CSV</button>
@@ -775,9 +798,106 @@ document.addEventListener('DOMContentLoaded', () => {
         </section>
       </div>
     `;
+    const attendanceDate = document.getElementById('attendanceDate');
+    const today = new Date();
+    attendanceDate.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     refreshPendingRequests();
     loadWardenApprovedHistory();
+    loadWardenGateAttendance();
+    attendanceDate.addEventListener('change', loadWardenGateAttendance);
+    document.getElementById('gateAttendanceFilter').addEventListener('change', loadWardenGateAttendance);
+    document.getElementById('download-gate-departures').addEventListener('click', () => downloadGateReport('left'));
+    document.getElementById('download-gate-arrivals').addEventListener('click', () => downloadGateReport('entered'));
+    if (wardenAttendanceTimer !== null) clearInterval(wardenAttendanceTimer);
+    wardenAttendanceTimer = setInterval(loadWardenGateAttendance, 30000);
     document.getElementById('warden-download-approved-csv').addEventListener('click', downloadWardenApprovedCsv);
+  }
+
+  async function loadWardenGateAttendance() {
+    const target = document.getElementById('warden-gate-attendance');
+    const dateInput = document.getElementById('attendanceDate');
+    const filterInput = document.getElementById('gateAttendanceFilter');
+    if (!target || !dateInput || !filterInput || !dateInput.value) return;
+    target.className = 'overflow-x-auto';
+
+    try {
+      const params = new URLSearchParams({ date: dateInput.value, filter: filterInput.value });
+      const response = await fetch(`/api/index.php?endpoint=get_warden_gate_logs.php&${params.toString()}`);
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || 'Unable to load gate attendance.');
+      const items = result.items || [];
+      if (!items.length) {
+        target.textContent = 'No gate attendance records found for this date and filter.';
+        return;
+      }
+
+      const table = document.createElement('table');
+      table.className = 'min-w-full border border-gray-300 text-sm';
+      const headings = ['SAP ID', 'Student', 'Room', 'Hostel Block', 'Destination', 'Parent Phone', 'Gate OUT', 'Gate IN', 'Return Status'];
+      const thead = document.createElement('thead');
+      thead.className = 'bg-gray-100 text-gray-700';
+      const headingRow = document.createElement('tr');
+      headings.forEach(label => {
+        const cell = document.createElement('th');
+        cell.className = 'whitespace-nowrap px-3 py-2 text-left';
+        cell.textContent = label;
+        headingRow.appendChild(cell);
+      });
+      thead.appendChild(headingRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      items.forEach(item => {
+        const row = document.createElement('tr');
+        row.className = 'border-t border-gray-200 align-top';
+        [
+          item.sap_id,
+          item.student_name,
+          item.room_no,
+          item.hostel_block,
+          item.destination,
+          item.parent_phone,
+          item.gate_out_time,
+          item.gate_in_time
+        ].forEach(value => {
+          const cell = document.createElement('td');
+          cell.className = 'whitespace-nowrap px-3 py-2';
+          cell.textContent = value || '-';
+          row.appendChild(cell);
+        });
+
+        const statusCell = document.createElement('td');
+        statusCell.className = 'whitespace-nowrap px-3 py-2';
+        const status = item.live_status || item.return_timing_status || 'PENDING_EXIT';
+        const badge = document.createElement('span');
+        badge.className = `gate-status-badge ${gateAttendanceBadgeClass(status)}`;
+        badge.textContent = [status, item.variance_summary].filter(Boolean).join(' · ');
+        statusCell.appendChild(badge);
+        row.appendChild(statusCell);
+        tbody.appendChild(row);
+      });
+      table.appendChild(tbody);
+      target.replaceChildren(table);
+    } catch (error) {
+      console.error(error);
+      target.textContent = error.message || 'Unable to load gate attendance.';
+      target.className = 'overflow-x-auto text-sm text-red-600';
+    }
+  }
+
+  function gateAttendanceBadgeClass(status) {
+    if (status === 'LATE_RETURN' || status === 'OVERDUE') return 'gate-status-late';
+    if (status === 'EARLY_RETURN') return 'gate-status-early';
+    if (status === 'ON_TIME') return 'gate-status-on-time';
+    if (status === 'CURRENTLY OUTSIDE' || status === 'OUTSIDE') return 'gate-status-outside';
+    return 'gate-status-pending';
+  }
+
+  function downloadGateReport(type) {
+    const date = document.getElementById('attendanceDate')?.value;
+    if (!date || !['left', 'entered'].includes(type)) return;
+    const params = new URLSearchParams({ date, type });
+    window.location.assign(`/api/index.php?endpoint=export_gate_attendance.php&${params.toString()}`);
   }
 
   async function refreshPendingRequests() {
@@ -965,13 +1085,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const badge = document.createElement('p');
     const hasGateDecision = ['accept', 'reject'].includes(result.gate_decision);
+    const hasExited = Boolean(result.gate_out_time);
+    const hasEntered = Boolean(result.gate_in_time);
     const badgeColor = hasGateDecision && result.gate_decision === 'reject'
       ? 'bg-red-700 text-white'
+      : result.status === 'CHECKED_OUT' ? 'bg-amber-600 text-white'
+      : result.status === 'CHECKED_IN' ? 'bg-green-700 text-white'
       : result.valid_qr ? 'bg-green-700 text-white' : 'bg-amber-600 text-white';
     badge.className = `mt-2 inline-flex max-w-full whitespace-normal break-words rounded px-3 py-1 text-sm font-bold sm:text-lg ${badgeColor}`;
-    badge.textContent = hasGateDecision
-      ? result.gate_decision === 'accept' ? 'ALREADY ACCEPTED AT GATE' : 'ALREADY REJECTED AT GATE'
-      : result.valid_qr ? 'PASS VERIFIED' : 'PASS FOUND - QR SIGNATURE UNVERIFIED';
+    badge.textContent = result.status === 'CHECKED_OUT'
+      ? 'CURRENTLY OUTSIDE'
+      : result.status === 'CHECKED_IN'
+        ? 'RETURN RECORDED'
+        : hasGateDecision && result.gate_decision === 'reject'
+          ? 'ALREADY REJECTED AT GATE'
+          : result.valid_qr ? 'PASS VERIFIED' : 'PASS FOUND - QR SIGNATURE UNVERIFIED';
     card.appendChild(badge);
 
     const details = document.createElement('dl');
@@ -983,6 +1111,9 @@ document.addEventListener('DOMContentLoaded', () => {
       ['Valid until', result.end_date],
       ['Pass token', result.pass_token],
       ['Gate decision', hasGateDecision ? (result.gate_decision === 'accept' ? 'Accepted' : 'Rejected') : 'Not decided'],
+      ['Gate exit', result.gate_out_time],
+      ['Gate entry', result.gate_in_time],
+      ['Return timing', [result.return_timing_status, result.variance_summary].filter(Boolean).join(' · ')],
       ['Reason', result.reason]
     ].forEach(([label, value]) => {
       const row = document.createElement('div');
@@ -998,20 +1129,33 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     card.appendChild(details);
 
-    if (result.valid_qr && result.pass_token && !hasGateDecision) {
+    if (result.valid_qr && result.pass_token && result.status === 'Granted' && !hasExited && result.gate_decision !== 'reject') {
       const actions = document.createElement('div');
       actions.className = 'mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2';
-      const acceptButton = document.createElement('button');
-      acceptButton.type = 'button';
-      acceptButton.className = 'w-full whitespace-normal rounded-lg bg-green-700 px-4 py-3 text-base font-bold text-white hover:bg-green-800';
-      acceptButton.textContent = 'Accept at gate';
-      acceptButton.addEventListener('click', () => submitGateDecision(result, 'accept', actions));
-      const rejectButton = document.createElement('button');
-      rejectButton.type = 'button';
-      rejectButton.className = 'w-full whitespace-normal rounded-lg bg-red-700 px-4 py-3 text-base font-bold text-white hover:bg-red-800';
-      rejectButton.textContent = 'Reject pass';
-      rejectButton.addEventListener('click', () => submitGateDecision(result, 'reject', actions));
-      actions.append(acceptButton, rejectButton);
+      const exitButton = document.createElement('button');
+      exitButton.type = 'button';
+      exitButton.className = 'w-full whitespace-normal rounded-lg bg-green-700 px-4 py-3 text-base font-bold text-white hover:bg-green-800';
+      exitButton.textContent = 'Record Gate Exit (OUT)';
+      exitButton.addEventListener('click', () => submitGateDecision(result, 'exit', actions));
+      actions.appendChild(exitButton);
+      if (!hasGateDecision) {
+        const rejectButton = document.createElement('button');
+        rejectButton.type = 'button';
+        rejectButton.className = 'w-full whitespace-normal rounded-lg bg-red-700 px-4 py-3 text-base font-bold text-white hover:bg-red-800';
+        rejectButton.textContent = 'Reject pass';
+        rejectButton.addEventListener('click', () => submitGateDecision(result, 'reject', actions));
+        actions.appendChild(rejectButton);
+      }
+      card.appendChild(actions);
+    } else if (result.valid_qr && result.pass_token && result.status === 'CHECKED_OUT' && hasExited && !hasEntered) {
+      const actions = document.createElement('div');
+      actions.className = 'mt-4';
+      const entryButton = document.createElement('button');
+      entryButton.type = 'button';
+      entryButton.className = 'w-full whitespace-normal rounded-lg bg-cyan-700 px-4 py-3 text-base font-bold text-white hover:bg-cyan-800';
+      entryButton.textContent = 'Record Gate Entry (IN)';
+      entryButton.addEventListener('click', () => submitGateDecision(result, 'entry', actions));
+      actions.appendChild(entryButton);
       card.appendChild(actions);
     }
 
@@ -1035,10 +1179,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!response.ok || !result.success) throw new Error(result.message || 'Unable to record the gate decision.');
       const savedDecision = result.decision;
       const outcome = document.createElement('p');
-      outcome.className = `mt-4 rounded-lg p-3 text-center text-lg font-bold ${savedDecision === 'accept' ? 'bg-green-700 text-white' : 'bg-red-700 text-white'}`;
+      outcome.className = `mt-4 rounded-lg p-3 text-center text-lg font-bold ${['exit', 'entry', 'accept'].includes(savedDecision) ? 'bg-green-700 text-white' : 'bg-red-700 text-white'}`;
       outcome.textContent = result.message;
       actionContainer.replaceWith(outcome);
       await loadGateDecisionHistory();
+      if (savedDecision === 'exit' || savedDecision === 'entry') {
+        await verifySecurityPass({ token: pass.pass_token });
+      }
     } catch (error) {
       console.error(error);
       const target = document.getElementById('security-result');

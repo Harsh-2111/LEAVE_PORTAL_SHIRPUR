@@ -66,7 +66,7 @@ if ($school !== $expectedSchool || !in_array($hostel, $allowedHostels, true)) {
     exit;
 }
 
-$overlap = $pdo->prepare('SELECT id FROM leave_requests WHERE sap_id = ? AND status NOT IN (\'Rejected\', \'Cancelled\') AND start_date <= ? AND end_date >= ? LIMIT 1');
+$overlap = $pdo->prepare('SELECT id FROM leave_requests WHERE sap_id = ? AND status NOT IN (\'Rejected\', \'Cancelled\', \'CHECKED_IN\') AND start_date <= ? AND end_date >= ? LIMIT 1');
 $overlap->execute([$sapId, $endDate, $startDate]);
 if ($overlap->fetch()) {
     http_response_code(409);
