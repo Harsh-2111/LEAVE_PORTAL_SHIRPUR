@@ -12,6 +12,7 @@ $endpoints = [
     'submit_student_leave.php' => 'submit_student_leave.php',
     'list_leaves.php' => 'list_leaves.php',
     'record_call.php' => 'record_call.php',
+    'get_warden_followup_requests.php' => 'get_warden_followup_requests.php',
     'verify_pass.php' => 'verify_pass.php',
     'gate_decision.php' => 'gate_decision.php',
     'gate_history.php' => 'gate_history.php',

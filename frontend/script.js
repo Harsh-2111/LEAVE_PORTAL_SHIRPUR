@@ -771,6 +771,13 @@ document.addEventListener('DOMContentLoaded', () => {
           <h2 class="text-2xl font-semibold text-gray-700 mb-4">Pending Verification</h2>
           <div id="warden-pending-list" class="space-y-4"></div>
         </section>
+        <section class="mt-4">
+          <button id="warden-followup-toggle" type="button" aria-expanded="false" class="rounded-lg bg-amber-600 px-4 py-2 font-semibold text-white hover:bg-amber-700">Show Not Reached/Wrong person Leave</button>
+          <div id="warden-followup-section" class="hidden mt-4 rounded-xl border border-amber-200 bg-white p-5 shadow-sm">
+            <h2 class="mb-4 text-2xl font-semibold text-gray-700">Not Reached / Wrong Person Follow-up</h2>
+            <div id="warden-followup-list" class="overflow-x-auto" aria-live="polite">Open this section to load follow-up requests.</div>
+          </div>
+        </section>
         <section class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm mt-6">
           <h2 class="text-2xl font-semibold text-gray-700 mb-4">Daily Gate Attendance</h2>
           <div class="gate-attendance-controls mb-4">
@@ -802,6 +809,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const today = new Date();
     attendanceDate.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     refreshPendingRequests();
+    document.getElementById('warden-followup-toggle').addEventListener('click', toggleWardenFollowups);
     loadWardenApprovedHistory();
     loadWardenGateAttendance();
     attendanceDate.addEventListener('change', loadWardenGateAttendance);
@@ -925,33 +933,185 @@ document.addEventListener('DOMContentLoaded', () => {
             <button type="button" class="bg-yellow-500 text-white px-3 py-2 rounded" data-leave-id="${item.id}" data-outcome="Not Reachable" data-called-number="${item.parent_contact || ''}">Not Reachable</button>
             <button type="button" class="bg-gray-700 text-white px-3 py-2 rounded" data-leave-id="${item.id}" data-outcome="Wrong Person" data-called-number="${item.parent_contact || ''}">Wrong Person</button>
           </div>
-          <input type="text" data-remarks="${item.id}" class="mt-3 w-full p-2 border border-gray-300 rounded-lg" placeholder="Call remarks" />
+          <div data-remarks-container="${item.id}" class="mt-3"></div>
         </article>
       `).join('');
       target.querySelectorAll('[data-outcome]').forEach(button => {
-        button.addEventListener('click', async () => {
+        button.addEventListener('click', () => {
+          const outcome = button.dataset.outcome;
           const leaveId = button.dataset.leaveId;
-          const data = getCsrfFormData({
-            leave_id: leaveId,
-            outcome: button.dataset.outcome,
-            called_number: button.dataset.calledNumber || '',
-            remarks: target.querySelector(`[data-remarks="${leaveId}"]`)?.value || ''
-          });
-          try {
-            const response = await fetch('/api/index.php?endpoint=record_call.php', { method: 'POST', body: data });
-            const result = await response.json();
-            if (!result.success) window.alert(result.message || 'Call result update failed.');
-            await refreshPendingRequests();
-            await loadWardenApprovedHistory();
-          } catch (error) {
-            console.error(error);
-            window.alert('Call result failed.');
+          if (outcome === 'Not Reachable' || outcome === 'Wrong Person') {
+            showCallRemarksForm(button.closest('article'), {
+              leaveId,
+              outcome,
+              calledNumber: button.dataset.calledNumber || ''
+            });
+            return;
           }
+          saveWardenCallOutcome({
+            leaveId,
+            outcome,
+            calledNumber: button.dataset.calledNumber || '',
+            remarks: ''
+          });
         });
       });
     } catch (error) {
       console.error(error);
       target.innerHTML = '<p class="text-red-600">Unable to load pending requests.</p>';
+    }
+  }
+
+  function showCallRemarksForm(article, { leaveId, outcome, calledNumber }) {
+    const container = article?.querySelector(`[data-remarks-container="${leaveId}"]`);
+    if (!container) return;
+    const label = outcome === 'Not Reachable'
+      ? 'Explain why the parent could not be reached'
+      : 'Explain why the person who answered was not the parent';
+    container.innerHTML = `
+      <label class="block text-sm font-medium text-gray-700">
+        ${label} <span class="text-red-600">*</span>
+        <textarea data-call-remarks required maxlength="2000" rows="2" class="mt-2 w-full rounded-lg border border-gray-300 p-3" placeholder="Enter the reason for this call outcome"></textarea>
+      </label>
+      <button type="button" data-save-call-outcome class="mt-2 rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800">Save ${outcome}</button>
+    `;
+    const remarksInput = container.querySelector('[data-call-remarks]');
+    const validateRemarks = () => {
+      remarksInput.setCustomValidity(remarksInput.value.trim() ? '' : 'Please enter a reason for this outcome.');
+      return remarksInput.reportValidity();
+    };
+    remarksInput.addEventListener('input', () => remarksInput.setCustomValidity(''));
+    container.querySelector('[data-save-call-outcome]').addEventListener('click', () => {
+      if (!validateRemarks()) return;
+      saveWardenCallOutcome({ leaveId, outcome, calledNumber, remarks: remarksInput.value.trim() });
+    });
+    remarksInput.focus();
+  }
+
+  async function saveWardenCallOutcome({ leaveId, outcome, calledNumber = '', remarks = '' }) {
+    try {
+      const response = await fetch('/api/index.php?endpoint=record_call.php', {
+        method: 'POST',
+        body: getCsrfFormData({ leave_id: leaveId, outcome, called_number: calledNumber, remarks })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || 'Call result update failed.');
+      await refreshPendingRequests();
+      await loadWardenFollowups();
+      await loadWardenApprovedHistory();
+    } catch (error) {
+      console.error(error);
+      window.alert(error.message || 'Call result failed.');
+    }
+  }
+
+  async function toggleWardenFollowups() {
+    const section = document.getElementById('warden-followup-section');
+    const button = document.getElementById('warden-followup-toggle');
+    if (!section || !button) return;
+    const show = section.classList.contains('hidden');
+    section.classList.toggle('hidden', !show);
+    button.setAttribute('aria-expanded', String(show));
+    button.textContent = show
+      ? 'Hide Not Reached/Wrong person Leave'
+      : 'Show Not Reached/Wrong person Leave';
+    if (show) await loadWardenFollowups();
+  }
+
+  async function loadWardenFollowups() {
+    const target = document.getElementById('warden-followup-list');
+    if (!target) return;
+    target.textContent = 'Loading follow-up requests...';
+
+    try {
+      const response = await fetch('/api/index.php?endpoint=get_warden_followup_requests.php');
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || 'Unable to load follow-up requests.');
+      const items = result.items || [];
+      if (!items.length) {
+        target.textContent = 'No Not Reachable or Wrong Person requests need follow-up.';
+        return;
+      }
+
+      const table = document.createElement('table');
+      table.className = 'min-w-full border border-gray-300 text-sm';
+      const headings = ['SAP ID', 'Student', 'Dates', 'School / Hostel', 'Reason for Leave', 'Latest Call Outcome', 'Call Remarks', 'Called By / At', 'Resolve'];
+      const thead = document.createElement('thead');
+      thead.className = 'bg-gray-100 text-gray-700';
+      const headerRow = document.createElement('tr');
+      headings.forEach(label => {
+        const cell = document.createElement('th');
+        cell.className = 'whitespace-nowrap px-3 py-2 text-left';
+        cell.textContent = label;
+        headerRow.appendChild(cell);
+      });
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      items.forEach(item => {
+        const row = document.createElement('tr');
+        row.className = 'border-t border-gray-200 align-top';
+        [
+          item.sap_id,
+          item.name,
+          `${item.start_date} to ${item.end_date} (${item.leave_days} days)`,
+          `${item.school || '-'} / ${item.hostel || '-'}`,
+          item.reason,
+          item.followup_outcome,
+          item.followup_remarks,
+          `${item.called_by_name || '-'} / ${item.followup_called_at || '-'}`
+        ].forEach(value => {
+          const cell = document.createElement('td');
+          cell.className = 'min-w-32 px-3 py-2';
+          cell.textContent = value || '-';
+          row.appendChild(cell);
+        });
+
+        const actionCell = document.createElement('td');
+        actionCell.className = 'min-w-64 px-3 py-2';
+        const remarks = document.createElement('textarea');
+        remarks.required = true;
+        remarks.maxLength = 2000;
+        remarks.rows = 2;
+        remarks.className = 'mb-2 w-full rounded-lg border border-gray-300 p-2';
+        remarks.placeholder = 'Required reason for approving or rejecting';
+        remarks.setAttribute('aria-label', `Resolution remarks for ${item.name}`);
+        remarks.addEventListener('input', () => remarks.setCustomValidity(''));
+        actionCell.appendChild(remarks);
+
+        const actions = document.createElement('div');
+        actions.className = 'flex flex-wrap gap-2';
+        [
+          ['Confirmed', 'Approve', 'bg-green-700 hover:bg-green-800'],
+          ['Denied', 'Reject', 'bg-red-700 hover:bg-red-800']
+        ].forEach(([outcome, label, color]) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = `rounded px-3 py-2 font-semibold text-white ${color}`;
+          button.textContent = label;
+          button.addEventListener('click', () => {
+            remarks.setCustomValidity(remarks.value.trim() ? '' : 'Please enter a reason for approving or rejecting.');
+            if (!remarks.reportValidity()) return;
+            saveWardenCallOutcome({
+              leaveId: String(item.id),
+              outcome,
+              calledNumber: item.parent_contact || '',
+              remarks: remarks.value.trim()
+            });
+          });
+          actions.appendChild(button);
+        });
+        actionCell.appendChild(actions);
+        row.appendChild(actionCell);
+        tbody.appendChild(row);
+      });
+      table.appendChild(tbody);
+      target.replaceChildren(table);
+    } catch (error) {
+      console.error(error);
+      target.textContent = error.message || 'Unable to load follow-up requests.';
+      target.className = 'overflow-x-auto text-sm text-red-600';
     }
   }
 

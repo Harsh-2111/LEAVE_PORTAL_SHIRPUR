@@ -93,6 +93,8 @@ Choose the matching role on the login screen:
 
 Students sign in with their SAP ID, submit a leave request, and see its status in their history. Their profile is loaded from the student database; course controls the school selection, and gender controls hostel choices. The request appears only in the matching boys' or girls' warden queue. The warden records the parent call outcome; a confirmed request receives a gate pass and locally rendered QR code, which Security can verify.
 
+If a parent cannot be reached or the person answering is not the parent, the warden must enter a reason. The leave remains `Pending Verification` for the student but moves out of the Warden's main pending list into **Show Not Reached/Wrong person Leave**. From that follow-up table, a warden can approve or reject the request; a reason is required for either resolution. Approval grants the request and creates its gate pass; rejection changes its status to `Rejected`. Each call attempt and its remarks are retained in the call log.
+
 The admin CSV import uses the columns in `frontend/student_template.csv`, including student contact, gender, course, year, parent email, and parent contact. Imported students receive an initial password `Student@` plus the last four digits of their SAP ID.
 
 ### Existing database volume

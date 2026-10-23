@@ -53,6 +53,16 @@ if ($status !== '') {
     }
 }
 
+if ($status === 'Pending Verification' && $user['role'] === 'warden') {
+    $where[] = 'NOT EXISTS ('
+        . 'SELECT 1 FROM leave_call_log lcl '
+        . 'WHERE lcl.leave_id = lr.id '
+        . 'AND lcl.id = (SELECT MAX(latest_call.id) FROM leave_call_log latest_call WHERE latest_call.leave_id = lr.id) '
+        . 'AND lcl.outcome IN (?, ?)'
+        . ')';
+    array_push($params, 'Not Reachable', 'Wrong Person');
+}
+
 if ($startDate !== '') {
     $where[] = 'lr.start_date >= ?';
     $params[] = $startDate;
