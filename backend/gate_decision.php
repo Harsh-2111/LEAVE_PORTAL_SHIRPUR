@@ -101,6 +101,14 @@ try {
         $clockStmt = $pdo->query('SELECT NOW() AS gate_time');
         $gateTimeValue = $clockStmt->fetchColumn();
         $gateTime = new DateTimeImmutable((string)$gateTimeValue);
+        $gateOutTime = new DateTimeImmutable((string)$pass['gate_out_time'], $gateTime->getTimezone());
+        if ($gateTime < $gateOutTime->modify('+24 hours')) {
+            $pdo->rollBack();
+            http_response_code(409);
+            echo json_encode(['success' => false, 'message' => 'Gate entry can only be recorded after 24 hours have elapsed since the gate exit.']);
+            exit;
+        }
+
         $scheduledReturn = new DateTimeImmutable((string)$pass['end_date'], $gateTime->getTimezone());
         $bufferDeadline = $scheduledReturn->modify('+30 minutes');
         $varianceSummary = null;

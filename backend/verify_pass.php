@@ -83,6 +83,14 @@ $gateDecision = $gateDecisionRow
     ? ($gateDecisionRow['action'] === 'gate_pass_accepted' ? 'accept' : 'reject')
     : null;
 
+$gateEntryAvailable = false;
+if ($record['status'] === 'CHECKED_OUT' && $record['gate_out_time'] !== null && $record['gate_in_time'] === null) {
+    $clockStmt = $pdo->query('SELECT NOW()');
+    $gateTime = new DateTimeImmutable((string)$clockStmt->fetchColumn());
+    $gateOutTime = new DateTimeImmutable((string)$record['gate_out_time'], $gateTime->getTimezone());
+    $gateEntryAvailable = $gateTime >= $gateOutTime->modify('+24 hours');
+}
+
 $payload = [
     'success' => true,
     'leave_id' => (int)$record['id'],
@@ -97,6 +105,7 @@ $payload = [
     'reason' => $record['reason'],
     'gate_out_time' => $record['gate_out_time'],
     'gate_in_time' => $record['gate_in_time'],
+    'gate_entry_available' => $gateEntryAvailable,
     'return_timing_status' => $record['return_timing_status'],
     'variance_summary' => $record['variance_summary'],
 ];

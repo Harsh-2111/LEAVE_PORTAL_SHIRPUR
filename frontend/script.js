@@ -1308,7 +1308,7 @@ document.addEventListener('DOMContentLoaded', () => {
         actions.appendChild(rejectButton);
       }
       card.appendChild(actions);
-    } else if (result.valid_qr && result.pass_token && result.status === 'CHECKED_OUT' && hasExited && !hasEntered) {
+    } else if (result.valid_qr && result.pass_token && result.status === 'CHECKED_OUT' && hasExited && !hasEntered && result.gate_entry_available === true) {
       const actions = document.createElement('div');
       actions.className = 'mt-4';
       const entryButton = document.createElement('button');
