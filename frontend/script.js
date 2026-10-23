@@ -522,9 +522,10 @@ document.addEventListener('DOMContentLoaded', () => {
         message.textContent = result.message || (result.success ? 'Request submitted.' : 'Unable to submit request.');
         message.className = `text-sm ${result.success ? 'text-green-700' : 'text-red-600'}`;
         if (result.success) {
-          document.getElementById('student-leave-form').reset();
-          sapInput.value = state.user.login_id;
-          schoolSelect.value = expectedSchool;
+          startInput.value = '';
+          endInput.value = '';
+          document.getElementById('student-leave-reason').value = '';
+          document.getElementById('student-details-confirmed').checked = false;
           updateLeaveDays();
           await loadStudentHistory();
         }
