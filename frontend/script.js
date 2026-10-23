@@ -945,7 +945,8 @@ document.addEventListener('DOMContentLoaded', () => {
             showCallRemarksForm(button.closest('article'), {
               leaveId,
               outcome,
-              calledNumber: button.dataset.calledNumber || ''
+              calledNumber: button.dataset.calledNumber || '',
+              sourceRow: button.closest('article')
             });
             return;
           }
@@ -953,7 +954,9 @@ document.addEventListener('DOMContentLoaded', () => {
             leaveId,
             outcome,
             calledNumber: button.dataset.calledNumber || '',
-            remarks: ''
+            remarks: '',
+            sourceRow: button.closest('article'),
+            submitButton: button
           });
         });
       });
@@ -963,7 +966,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function showCallRemarksForm(article, { leaveId, outcome, calledNumber }) {
+  function showCallRemarksForm(article, { leaveId, outcome, calledNumber, sourceRow }) {
     const container = article?.querySelector(`[data-remarks-container="${leaveId}"]`);
     if (!container) return;
     const label = outcome === 'Not Reachable'
@@ -984,12 +987,24 @@ document.addEventListener('DOMContentLoaded', () => {
     remarksInput.addEventListener('input', () => remarksInput.setCustomValidity(''));
     container.querySelector('[data-save-call-outcome]').addEventListener('click', () => {
       if (!validateRemarks()) return;
-      saveWardenCallOutcome({ leaveId, outcome, calledNumber, remarks: remarksInput.value.trim() });
+      saveWardenCallOutcome({
+        leaveId,
+        outcome,
+        calledNumber,
+        remarks: remarksInput.value.trim(),
+        sourceRow,
+        submitButton: container.querySelector('[data-save-call-outcome]')
+      });
     });
     remarksInput.focus();
   }
 
-  async function saveWardenCallOutcome({ leaveId, outcome, calledNumber = '', remarks = '' }) {
+  async function saveWardenCallOutcome({ leaveId, outcome, calledNumber = '', remarks = '', sourceRow, submitButton }) {
+    const rowButtons = sourceRow?.querySelectorAll('button') || [];
+    rowButtons.forEach(button => { button.disabled = true; });
+    const originalButtonText = submitButton?.textContent;
+    if (submitButton) submitButton.textContent = 'Saving...';
+
     try {
       const response = await fetch('/api/index.php?endpoint=record_call.php', {
         method: 'POST',
@@ -997,11 +1012,18 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.message || 'Call result update failed.');
-      await refreshPendingRequests();
-      await loadWardenFollowups();
-      await loadWardenApprovedHistory();
+
+      sourceRow?.remove();
+      const refreshes = [refreshPendingRequests(), loadWardenApprovedHistory()];
+      const followupSection = document.getElementById('warden-followup-section');
+      if (followupSection && !followupSection.classList.contains('hidden')) {
+        refreshes.push(loadWardenFollowups());
+      }
+      void Promise.allSettled(refreshes);
     } catch (error) {
       console.error(error);
+      rowButtons.forEach(button => { button.disabled = false; });
+      if (submitButton && originalButtonText) submitButton.textContent = originalButtonText;
       window.alert(error.message || 'Call result failed.');
     }
   }
@@ -1098,7 +1120,9 @@ document.addEventListener('DOMContentLoaded', () => {
               leaveId: String(item.id),
               outcome,
               calledNumber: item.parent_contact || '',
-              remarks: remarks.value.trim()
+              remarks: remarks.value.trim(),
+              sourceRow: row,
+              submitButton: button
             });
           });
           actions.appendChild(button);
