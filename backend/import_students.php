@@ -279,7 +279,8 @@ $studentColumns = [
     'sap_id', 'name', 'student_contact', 'gender', 'course', 'year', 'branch', 'batch',
     'hostel_block', 'room_no', 'parent_name', 'parent_email', 'parent_contact',
 ];
-$studentPlaceholders = '(' . implode(', ', array_fill(0, count($studentColumns), '?')) . ')';
+$studentPlaceholders = '(' . implode(', ', array_fill(0, count($studentColumns), '?'))
+    . ', ' . (DB_DRIVER === 'pgsql' ? 'TRUE' : '1') . ', NOW())';
 $studentUpdate = implode(', ', array_map(
     static fn(string $column): string => $column . ' = ' . (DB_DRIVER === 'pgsql' ? 'EXCLUDED.' . $column : 'VALUES(' . $column . ')'),
     array_slice($studentColumns, 1)
