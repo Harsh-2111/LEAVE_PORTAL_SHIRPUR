@@ -1774,8 +1774,20 @@ document.addEventListener('DOMContentLoaded', () => {
       formData.append('csrf_token', state.csrfToken);
       try {
         const response = await fetch('/api/index.php?endpoint=import_students.php', { method: 'POST', body: formData });
-        const result = await response.json();
-        showMessage(resultTarget, result.message || 'Import complete.', result.success ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50');
+        const responseText = await response.text();
+        let result;
+        try {
+          result = JSON.parse(responseText);
+        } catch {
+          throw new Error(`Import server returned an unreadable response (HTTP ${response.status}). Check the deployment function logs before trying again.`);
+        }
+        const importSucceeded = response.ok && result.success;
+        const statusNote = response.ok ? '' : ` (HTTP ${response.status})`;
+        showMessage(
+          resultTarget,
+          `${result.message || (importSucceeded ? 'Import complete.' : 'The server could not complete the import.')}${statusNote}`,
+          importSucceeded ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'
+        );
         if (result.errors?.length) {
           const errors = document.createElement('ul');
           errors.className = 'mt-2 list-inside list-disc';
@@ -1791,7 +1803,8 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           resultTarget.appendChild(errors);
         }
-        if (result.success && result.temporary_credentials?.length) {
+        if (!importSucceeded) return;
+        if (result.temporary_credentials?.length) {
           const csvCell = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
           const rows = [
             ['SAP ID', 'Temporary Password'].map(csvCell).join(','),
@@ -1811,7 +1824,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       } catch (error) {
         console.error(error);
-        showMessage(resultTarget, 'Import request failed. Check the network response before retrying; a completed import may already have committed.', 'text-red-700 bg-red-50');
+        showMessage(resultTarget, `${error.message || 'Import request failed.'} Do not upload again until you confirm whether these students were added.`, 'text-red-700 bg-red-50');
       } finally {
         submitButton.disabled = false;
         submitButton.textContent = 'Import Students';
