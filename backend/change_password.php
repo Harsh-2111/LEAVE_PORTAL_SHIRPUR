@@ -23,9 +23,9 @@ if ($currentPassword === '' || $newPassword === '' || $confirmPassword === '') {
     exit;
 }
 
-if (strlen($newPassword) < 12) {
+if (strlen($newPassword) < 8) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'New password must be at least 12 characters long.']);
+    echo json_encode(['success' => false, 'message' => 'New password must be at least 8 characters long.']);
     exit;
 }
 

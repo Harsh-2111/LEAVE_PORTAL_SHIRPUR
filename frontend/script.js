@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (message) hideMessage(message);
     document.getElementById('change-password-title').textContent = mustChangePassword ? 'First-time Password Change Required' : 'Change Password';
     document.getElementById('change-password-description').textContent = mustChangePassword
-      ? 'Set a private password of at least 12 characters before continuing. Your temporary password will stop working after this change.'
+      ? 'Set a private password of at least 8 characters before continuing. Your temporary password will stop working after this change.'
       : 'Use a password you have not used before.';
     document.getElementById('close-change-password-modal').classList.toggle('hidden', mustChangePassword);
     document.getElementById('cancel-change-password').classList.toggle('hidden', mustChangePassword);
@@ -130,8 +130,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const message = document.getElementById('forgot-password-reset-message');
     const newPassword = document.getElementById('forgot-new-password').value;
     const confirmPassword = document.getElementById('forgot-confirm-password').value;
-    if (newPassword.length < 12) {
-      showMessage(message, 'New password must be at least 12 characters long.', 'text-red-700 bg-red-50');
+    if (newPassword.length < 8) {
+      showMessage(message, 'New password must be at least 8 characters long.', 'text-red-700 bg-red-50');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -599,8 +599,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (newPassword.length < 12) {
-      showMessage(message, 'New password must be at least 12 characters long.', 'error');
+    if (newPassword.length < 8) {
+      showMessage(message, 'New password must be at least 8 characters long.', 'error');
       return;
     }
 
