@@ -70,7 +70,7 @@ if ($handle === false) {
     exit;
 }
 
-$header = fgetcsv($handle);
+$header = fgetcsv($handle, null, ',', '"', '');
 if ($header === false || count($header) === 0) {
     fclose($handle);
     http_response_code(400);
@@ -130,7 +130,7 @@ $courseMap = [
     'agriculture' => 'Agriculture',
 ];
 
-while (($row = fgetcsv($handle)) !== false) {
+while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
     $lineNumber++;
     if (count($row) === 1 && trim((string)$row[0]) === '') {
         continue;
