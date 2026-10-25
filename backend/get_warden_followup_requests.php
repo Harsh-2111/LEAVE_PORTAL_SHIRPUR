@@ -18,20 +18,35 @@ if (!in_array($user['warden_gender'] ?? '', ['male', 'female'], true)) {
     exit;
 }
 
-$stmt = $pdo->prepare(
-    'SELECT lr.id, lr.sap_id, s.name, s.gender, s.course, s.year, s.branch, s.batch, '
-    . 's.parent_email, s.parent_contact, lr.start_date, lr.end_date, lr.leave_days, lr.reason, '
-    . 'lr.school, lr.hostel, lr.status, latest.outcome AS followup_outcome, latest.remarks AS followup_remarks, '
-    . 'latest.called_at AS followup_called_at, caller.name AS called_by_name '
-    . 'FROM leave_requests lr '
+$page = max(1, (int)($_GET['page'] ?? 1));
+$limit = min(100, max(1, (int)($_GET['limit'] ?? 20)));
+$offset = ($page - 1) * $limit;
+$fromSql =
+    ' FROM leave_requests lr '
     . 'INNER JOIN students s ON s.sap_id = lr.sap_id '
     . 'INNER JOIN leave_call_log latest ON latest.id = ('
     . 'SELECT MAX(latest_call.id) FROM leave_call_log latest_call WHERE latest_call.leave_id = lr.id'
     . ') '
     . 'INNER JOIN users caller ON caller.id = latest.called_by '
-    . 'WHERE s.gender = ? AND lr.status = ? AND latest.outcome IN (?, ?) '
-    . 'ORDER BY latest.called_at DESC, lr.created_at DESC'
+    . 'WHERE s.gender = ? AND lr.status = ? AND latest.outcome IN (?, ?)';
+$params = [$user['warden_gender'], 'Pending Verification', 'Not Reachable', 'Wrong Person'];
+$stmt = $pdo->prepare(
+    'SELECT lr.id, lr.sap_id, s.name, s.gender, s.course, s.year, s.branch, s.batch, '
+    . 's.parent_email, s.parent_contact, lr.start_date, lr.end_date, lr.leave_days, lr.reason, '
+    . 'lr.school, lr.hostel, lr.status, latest.outcome AS followup_outcome, latest.remarks AS followup_remarks, '
+    . 'latest.called_at AS followup_called_at, caller.name AS called_by_name '
+    . $fromSql
+    . ' ORDER BY latest.called_at DESC, lr.created_at DESC LIMIT ? OFFSET ?'
 );
-$stmt->execute([$user['warden_gender'], 'Pending Verification', 'Not Reachable', 'Wrong Person']);
+$stmt->execute(array_merge($params, [$limit, $offset]));
+$countStmt = $pdo->prepare('SELECT COUNT(*) AS total' . $fromSql);
+$countStmt->execute($params);
+$total = (int)$countStmt->fetch()['total'];
 
-echo json_encode(['success' => true, 'items' => $stmt->fetchAll()]);
+echo json_encode([
+    'success' => true,
+    'page' => $page,
+    'limit' => $limit,
+    'total' => $total,
+    'items' => $stmt->fetchAll(),
+]);

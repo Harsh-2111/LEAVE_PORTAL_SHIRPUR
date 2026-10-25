@@ -23,9 +23,9 @@ if ($currentPassword === '' || $newPassword === '' || $confirmPassword === '') {
     exit;
 }
 
-if (strlen($newPassword) < 8) {
+if (strlen($newPassword) < 12) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'New password must be at least 8 characters long.']);
+    echo json_encode(['success' => false, 'message' => 'New password must be at least 12 characters long.']);
     exit;
 }
 
@@ -51,6 +51,8 @@ $updateSql = DB_DRIVER === 'pgsql'
     : 'UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?';
 $update = $pdo->prepare($updateSql);
 $update->execute([$hash, (int)$user['id']]);
+$user['must_change_password'] = false;
+$_SESSION['user']['must_change_password'] = false;
 
 writeAudit($pdo, (int)$user['id'], 'change_password', 'users', (int)$user['id'], [], $_SERVER['REMOTE_ADDR'] ?? null);
 

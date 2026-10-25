@@ -128,7 +128,22 @@ function requireRole(array $roles): array
         exit;
     }
 
+    requirePasswordChangeComplete($user);
+
     return $user;
+}
+
+function requirePasswordChangeComplete(array $user): void
+{
+    if (databaseBool($user['must_change_password'] ?? false)) {
+        http_response_code(403);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Change your temporary password before using the application.',
+            'must_change_password' => true,
+        ]);
+        exit;
+    }
 }
 
 function writeAudit(PDO $pdo, ?int $userId, string $action, string $entity, ?int $entityId = null, array $details = [], ?string $ip = null): void

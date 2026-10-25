@@ -11,6 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 $user = requireAuth();
+requirePasswordChangeComplete($user);
 if (!in_array($user['role'], ['student', 'warden', 'admin'], true)) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Access denied for this role.']);

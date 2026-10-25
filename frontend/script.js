@@ -13,19 +13,32 @@ document.addEventListener('DOMContentLoaded', () => {
   const logoutModal = document.getElementById('logout-confirm-modal');
   const changePasswordModal = document.getElementById('change-password-modal');
   const forgotPasswordModal = document.getElementById('forgot-password-modal');
-  const state = { csrfToken: '', user: null, wardenApprovedHistory: [], forgotResetToken: '', forgotCsrfToken: '' };
+  const state = { csrfToken: '', user: null, wardenApprovedTotal: 0, forgotResetToken: '', forgotCsrfToken: '' };
   let loginProgressTimer = null;
   let wardenAttendanceTimer = null;
   let securityQrScanner = null;
   let handlingSecurityScan = false;
+  let wardenPendingPage = 1;
+  let wardenPendingTotal = 0;
+  let wardenFollowupPage = 1;
+  let wardenFollowupTotal = 0;
+  let wardenApprovedPage = 1;
 
   function openChangePasswordModal() {
     if (!changePasswordModal) return;
     const form = document.getElementById('change-password-form');
     const message = document.getElementById('change-password-message');
+    const mustChangePassword = Boolean(state.user?.must_change_password);
     if (form) form.reset();
     resetChangePasswordVisibility();
     if (message) hideMessage(message);
+    document.getElementById('change-password-title').textContent = mustChangePassword ? 'First-time Password Change Required' : 'Change Password';
+    document.getElementById('change-password-description').textContent = mustChangePassword
+      ? 'Set a private password of at least 12 characters before continuing. Your temporary password will stop working after this change.'
+      : 'Use a password you have not used before.';
+    document.getElementById('close-change-password-modal').classList.toggle('hidden', mustChangePassword);
+    document.getElementById('cancel-change-password').classList.toggle('hidden', mustChangePassword);
+    document.getElementById('forced-change-logout').classList.toggle('hidden', !mustChangePassword);
     changePasswordModal.classList.remove('hidden');
   }
 
@@ -37,6 +50,9 @@ document.addEventListener('DOMContentLoaded', () => {
     resetChangePasswordVisibility();
     if (message) hideMessage(message);
     changePasswordModal.classList.add('hidden');
+    document.getElementById('close-change-password-modal').classList.remove('hidden');
+    document.getElementById('cancel-change-password').classList.remove('hidden');
+    document.getElementById('forced-change-logout').classList.add('hidden');
   }
 
   function openForgotPasswordModal() {
@@ -114,8 +130,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const message = document.getElementById('forgot-password-reset-message');
     const newPassword = document.getElementById('forgot-new-password').value;
     const confirmPassword = document.getElementById('forgot-confirm-password').value;
-    if (newPassword.length < 8) {
-      showMessage(message, 'New password must be at least 8 characters long.', 'text-red-700 bg-red-50');
+    if (newPassword.length < 12) {
+      showMessage(message, 'New password must be at least 12 characters long.', 'text-red-700 bg-red-50');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -173,6 +189,33 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!element) return;
     element.textContent = '';
     element.classList.add('hidden');
+  }
+
+  function createPaginationControls(page, total, pageSize, onPageChange) {
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (totalPages <= 1) return null;
+    const controls = document.createElement('div');
+    controls.className = 'mt-4 flex flex-wrap items-center justify-between gap-3';
+    const summary = document.createElement('span');
+    summary.className = 'text-sm text-gray-600';
+    summary.textContent = `Page ${page} of ${totalPages} · ${total} records`;
+    controls.appendChild(summary);
+    const buttons = document.createElement('div');
+    buttons.className = 'flex gap-2';
+    [
+      ['Previous', page > 1, page - 1],
+      ['Next', page < totalPages, page + 1]
+    ].forEach(([label, enabled, targetPage]) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = label;
+      button.disabled = !enabled;
+      button.className = 'rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold disabled:opacity-50';
+      button.addEventListener('click', () => onPageChange(targetPage));
+      buttons.appendChild(button);
+    });
+    controls.appendChild(buttons);
+    return controls;
   }
 
   function resetLoginProgress() {
@@ -270,6 +313,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       state.user = result.user;
       state.csrfToken = result.csrf_token || '';
+      if (state.user.must_change_password) {
+        openChangePasswordModal();
+        return;
+      }
       await showAuthenticatedPortal();
     } catch (error) {
       console.warn('Unable to restore the current session.', error);
@@ -307,7 +354,8 @@ document.addEventListener('DOMContentLoaded', () => {
       hideMessage(loginMessage);
       setTimeout(async () => {
         resetLoginProgress();
-        await showAuthenticatedPortal();
+        if (state.user.must_change_password) openChangePasswordModal();
+        else await showAuthenticatedPortal();
       }, 350);
     } catch (error) {
       console.error(error);
@@ -551,8 +599,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (newPassword.length < 8) {
-      showMessage(message, 'New password must be at least 8 characters long.', 'error');
+    if (newPassword.length < 12) {
+      showMessage(message, 'New password must be at least 12 characters long.', 'error');
       return;
     }
 
@@ -582,8 +630,15 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      showMessage(message, 'Password updated successfully.', 'success');
-      setTimeout(() => closeChangePasswordModal(), 1200);
+      const wasRequired = Boolean(state.user?.must_change_password);
+      if (state.user) state.user.must_change_password = false;
+      if (wasRequired) {
+        closeChangePasswordModal();
+        await showAuthenticatedPortal();
+      } else {
+        showMessage(message, 'Password updated successfully.', 'success');
+        setTimeout(() => closeChangePasswordModal(), 1200);
+      }
     } catch (error) {
       console.error(error);
       showMessage(message, error.message || 'Password update failed. Please try again.', 'error');
@@ -762,6 +817,9 @@ document.addEventListener('DOMContentLoaded', () => {
     appContainer.classList.add('portal-wide');
     wardenPage.classList.remove('hidden');
     const hostelGroup = state.user?.warden_gender === 'female' ? 'Girls Hostel' : 'Boys Hostel';
+    wardenPendingPage = 1;
+    wardenFollowupPage = 1;
+    wardenApprovedPage = 1;
     wardenPage.innerHTML = `
       <div class="max-w-5xl mx-auto">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
@@ -912,57 +970,100 @@ document.addEventListener('DOMContentLoaded', () => {
   async function refreshPendingRequests() {
     const target = document.getElementById('warden-pending-list');
     if (!target) return;
+    target.className = 'space-y-4';
     try {
-      const response = await fetch('/api/index.php?endpoint=list_leaves.php&status=Pending%20Verification&limit=20');
+      const params = new URLSearchParams({
+        status: 'Pending Verification',
+        limit: '20',
+        page: String(wardenPendingPage)
+      });
+      const response = await fetch(`/api/index.php?endpoint=list_leaves.php&${params.toString()}`);
       const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || 'Unable to load pending requests.');
       const items = result.items || [];
+      wardenPendingTotal = Number(result.total) || 0;
       if (!items.length) {
-        target.innerHTML = '<p class="text-gray-500">No pending verification requests.</p>';
+        if (wardenPendingPage > 1) {
+          wardenPendingPage -= 1;
+          await refreshPendingRequests();
+          return;
+        }
+        target.textContent = 'No pending verification requests.';
         return;
       }
-      target.innerHTML = items.map(item => `
-        <article class="border border-gray-200 rounded-lg p-4 bg-gray-50">
-          <p><strong>${item.name}</strong> (${item.sap_id})</p>
-          <p>${item.course || ''} | ${item.year || ''} | ${item.gender || ''}</p>
-          <p>Dates: ${item.start_date} to ${item.end_date} (${item.leave_days} days)</p>
-          <p>School / Hostel: ${item.school || '-'} / ${item.hostel || '-'}</p>
-          <p>Reason: ${item.reason}</p>
-          <p>Call parent: ${item.parent_contact || 'Contact unavailable'} | ${item.parent_email || ''}</p>
-          <div class="mt-3 flex flex-wrap gap-2">
-            <button type="button" class="bg-green-600 text-white px-3 py-2 rounded" data-leave-id="${item.id}" data-outcome="Confirmed" data-called-number="${item.parent_contact || ''}">Confirmed</button>
-            <button type="button" class="bg-red-600 text-white px-3 py-2 rounded" data-leave-id="${item.id}" data-outcome="Denied" data-called-number="${item.parent_contact || ''}">Denied</button>
-            <button type="button" class="bg-yellow-500 text-white px-3 py-2 rounded" data-leave-id="${item.id}" data-outcome="Not Reachable" data-called-number="${item.parent_contact || ''}">Not Reachable</button>
-            <button type="button" class="bg-gray-700 text-white px-3 py-2 rounded" data-leave-id="${item.id}" data-outcome="Wrong Person" data-called-number="${item.parent_contact || ''}">Wrong Person</button>
-          </div>
-          <div data-remarks-container="${item.id}" class="mt-3"></div>
-        </article>
-      `).join('');
-      target.querySelectorAll('[data-outcome]').forEach(button => {
-        button.addEventListener('click', () => {
-          const outcome = button.dataset.outcome;
-          const leaveId = button.dataset.leaveId;
-          if (outcome === 'Not Reachable' || outcome === 'Wrong Person') {
-            showCallRemarksForm(button.closest('article'), {
-              leaveId,
-              outcome,
-              calledNumber: button.dataset.calledNumber || '',
-              sourceRow: button.closest('article')
-            });
-            return;
-          }
-          saveWardenCallOutcome({
-            leaveId,
-            outcome,
-            calledNumber: button.dataset.calledNumber || '',
-            remarks: '',
-            sourceRow: button.closest('article'),
-            submitButton: button
-          });
+      const content = document.createDocumentFragment();
+      items.forEach(item => {
+        const article = document.createElement('article');
+        article.className = 'border border-gray-200 rounded-lg p-4 bg-gray-50';
+        const fields = [
+          [`${item.name || ''} (${item.sap_id || ''})`, 'font-semibold'],
+          [`${item.course || ''} | ${item.year || ''} | ${item.gender || ''}`, ''],
+          [`Dates: ${item.start_date} to ${item.end_date} (${item.leave_days} days)`, ''],
+          [`School / Hostel: ${item.school || '-'} / ${item.hostel || '-'}`, ''],
+          [`Reason: ${item.reason || '-'}`, ''],
+          [`Call parent: ${item.parent_contact || 'Contact unavailable'} | ${item.parent_email || ''}`, '']
+        ];
+        fields.forEach(([value, className]) => {
+          const paragraph = document.createElement('p');
+          paragraph.className = className;
+          paragraph.textContent = value;
+          article.appendChild(paragraph);
         });
+        const actions = document.createElement('div');
+        actions.className = 'mt-3 flex flex-wrap gap-2';
+        [
+          ['Confirmed', 'bg-green-600'],
+          ['Denied', 'bg-red-600'],
+          ['Not Reachable', 'bg-yellow-500'],
+          ['Wrong Person', 'bg-gray-700']
+        ].forEach(([outcome, color]) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = `${color} rounded px-3 py-2 text-white`;
+          button.textContent = outcome;
+          button.dataset.leaveId = item.id;
+          button.dataset.outcome = outcome;
+          button.dataset.calledNumber = item.parent_contact || '';
+          button.addEventListener('click', () => {
+            const selectedOutcome = button.dataset.outcome;
+            const leaveId = button.dataset.leaveId;
+            if (selectedOutcome === 'Not Reachable' || selectedOutcome === 'Wrong Person') {
+              showCallRemarksForm(article, {
+                leaveId,
+                outcome: selectedOutcome,
+                calledNumber: button.dataset.calledNumber || '',
+                sourceRow: article
+              });
+              return;
+            }
+            saveWardenCallOutcome({
+              leaveId,
+              outcome: selectedOutcome,
+              calledNumber: button.dataset.calledNumber || '',
+              remarks: '',
+              sourceRow: article,
+              submitButton: button
+            });
+          });
+          actions.appendChild(button);
+        });
+        article.appendChild(actions);
+        const remarks = document.createElement('div');
+        remarks.className = 'mt-3';
+        remarks.dataset.remarksContainer = item.id;
+        article.appendChild(remarks);
+        content.appendChild(article);
       });
+      target.replaceChildren(content);
+      const controls = createPaginationControls(wardenPendingPage, wardenPendingTotal, 20, page => {
+        wardenPendingPage = page;
+        void refreshPendingRequests();
+      });
+      if (controls) target.appendChild(controls);
     } catch (error) {
       console.error(error);
-      target.innerHTML = '<p class="text-red-600">Unable to load pending requests.</p>';
+      target.textContent = error.message || 'Unable to load pending requests.';
+      target.className = 'space-y-4 text-red-600';
     }
   }
 
@@ -1044,14 +1145,22 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadWardenFollowups() {
     const target = document.getElementById('warden-followup-list');
     if (!target) return;
+    target.className = 'overflow-x-auto';
     target.textContent = 'Loading follow-up requests...';
 
     try {
-      const response = await fetch('/api/index.php?endpoint=get_warden_followup_requests.php');
+      const params = new URLSearchParams({ page: String(wardenFollowupPage), limit: '20' });
+      const response = await fetch(`/api/index.php?endpoint=get_warden_followup_requests.php&${params.toString()}`);
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.message || 'Unable to load follow-up requests.');
       const items = result.items || [];
+      wardenFollowupTotal = Number(result.total) || 0;
       if (!items.length) {
+        if (wardenFollowupPage > 1) {
+          wardenFollowupPage -= 1;
+          await loadWardenFollowups();
+          return;
+        }
         target.textContent = 'No Not Reachable or Wrong Person requests need follow-up.';
         return;
       }
@@ -1132,7 +1241,12 @@ document.addEventListener('DOMContentLoaded', () => {
         tbody.appendChild(row);
       });
       table.appendChild(tbody);
+      const controls = createPaginationControls(wardenFollowupPage, wardenFollowupTotal, 20, page => {
+        wardenFollowupPage = page;
+        void loadWardenFollowups();
+      });
       target.replaceChildren(table);
+      if (controls) target.appendChild(controls);
     } catch (error) {
       console.error(error);
       target.textContent = error.message || 'Unable to load follow-up requests.';
@@ -1143,27 +1257,23 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadWardenApprovedHistory() {
     const target = document.getElementById('warden-approved-history');
     if (!target) return;
+    target.className = 'overflow-x-auto';
     target.textContent = 'Loading approved leaves...';
 
     try {
-      const items = [];
-      let page = 1;
-      let total = 0;
-      do {
-        const params = new URLSearchParams({ status: 'Granted', limit: '100', page: String(page) });
-        const response = await fetch(`/api/index.php?endpoint=list_leaves.php&${params.toString()}`);
-        const result = await response.json();
-        if (!response.ok || !result.success) throw new Error(result.message || 'Unable to load approved leave history.');
-        const pageItems = result.items || [];
-        items.push(...pageItems);
-        total = Number(result.total) || 0;
-        if (!pageItems.length) break;
-        page += 1;
-      } while (items.length < total);
-
-      state.wardenApprovedHistory = items;
-      document.getElementById('warden-download-approved-csv').disabled = false;
+      const params = new URLSearchParams({ status: 'Granted', limit: '100', page: String(wardenApprovedPage) });
+      const response = await fetch(`/api/index.php?endpoint=list_leaves.php&${params.toString()}`);
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || 'Unable to load approved leave history.');
+      const items = result.items || [];
+      state.wardenApprovedTotal = Number(result.total) || 0;
+      document.getElementById('warden-download-approved-csv').disabled = state.wardenApprovedTotal === 0;
       if (!items.length) {
+        if (wardenApprovedPage > 1) {
+          wardenApprovedPage -= 1;
+          await loadWardenApprovedHistory();
+          return;
+        }
         target.textContent = 'No approved leaves found for this hostel group.';
         return;
       }
@@ -1209,6 +1319,11 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       table.appendChild(body);
       target.replaceChildren(table);
+      const controls = createPaginationControls(wardenApprovedPage, state.wardenApprovedTotal, 100, page => {
+        wardenApprovedPage = page;
+        void loadWardenApprovedHistory();
+      });
+      if (controls) target.appendChild(controls);
     } catch (error) {
       console.error(error);
       target.textContent = error.message || 'Unable to load approved leave history.';
@@ -1216,29 +1331,55 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function downloadWardenApprovedCsv() {
-    const columns = [
-      ['SAP ID', 'sap_id'], ['Student Name', 'name'], ['Gender', 'gender'], ['Course', 'course'],
-      ['Year', 'year'], ['Branch', 'branch'], ['Batch', 'batch'], ['Start Date', 'start_date'],
-      ['End Date', 'end_date'], ['Leave Days', 'leave_days'], ['School', 'school'],
-      ['Hostel', 'hostel'], ['Reason', 'reason'], ['Approved At', 'granted_at']
-    ];
-    const csvCell = value => {
-      let text = String(value ?? '');
-      if (/^\s*[=+@-]/.test(text)) text = `'${text}`;
-      return `"${text.replace(/"/g, '""')}"`;
-    };
-    const rows = [
-      columns.map(([label]) => csvCell(label)).join(','),
-      ...state.wardenApprovedHistory.map(item => columns.map(([, key]) => csvCell(item[key])).join(','))
-    ];
-    const blob = new Blob([`\uFEFF${rows.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `approved-leaves-${state.user?.warden_gender || 'hostel'}-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  async function downloadWardenApprovedCsv() {
+    const button = document.getElementById('warden-download-approved-csv');
+    if (!button) return;
+    button.disabled = true;
+    const originalText = button.textContent;
+    button.textContent = 'Preparing CSV...';
+    try {
+      const items = [];
+      let exportTotal = state.wardenApprovedTotal;
+      for (let page = 1; items.length < exportTotal; page++) {
+        const params = new URLSearchParams({ status: 'Granted', limit: '100', page: String(page) });
+        const response = await fetch(`/api/index.php?endpoint=list_leaves.php&${params.toString()}`);
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Unable to prepare approved leave export.');
+        exportTotal = Number(result.total) || 0;
+        const pageItems = result.items || [];
+        if (!pageItems.length) break;
+        items.push(...pageItems);
+      }
+      if (items.length !== exportTotal) throw new Error('Approved leave records changed during export. Please try again.');
+      const columns = [
+        ['SAP ID', 'sap_id'], ['Student Name', 'name'], ['Gender', 'gender'], ['Course', 'course'],
+        ['Year', 'year'], ['Branch', 'branch'], ['Batch', 'batch'], ['Start Date', 'start_date'],
+        ['End Date', 'end_date'], ['Leave Days', 'leave_days'], ['School', 'school'],
+        ['Hostel', 'hostel'], ['Reason', 'reason'], ['Approved At', 'granted_at']
+      ];
+      const csvCell = value => {
+        let text = String(value ?? '');
+        if (/^\s*[=+@-]/.test(text)) text = `'${text}`;
+        return `"${text.replace(/"/g, '""')}"`;
+      };
+      const rows = [
+        columns.map(([label]) => csvCell(label)).join(','),
+        ...items.map(item => columns.map(([, key]) => csvCell(item[key])).join(','))
+      ];
+      const blob = new Blob([`\uFEFF${rows.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `approved-leaves-${state.user?.warden_gender || 'hostel'}-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      console.error(error);
+      window.alert(error.message || 'Unable to prepare approved leave export.');
+    } finally {
+      button.disabled = state.wardenApprovedTotal === 0;
+      button.textContent = originalText;
+    }
   }
 
   function extractPassToken(decodedValue) {
@@ -1597,10 +1738,15 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <section class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
           <h2 class="text-2xl font-semibold text-gray-700 mb-4">Import Students CSV</h2>
-          <p class="text-sm text-gray-600 mb-3"><a href="/frontend/student_template.csv" class="text-blue-600 underline">Student CSV template</a></p>
+          <p class="text-sm text-gray-600 mb-3"><a href="/frontend/student_template.csv" class="text-blue-600 underline">Student CSV template</a>. Export an UTF-8 CSV from Excel; XLSX files are not accepted. Maximum 2,500 rows and 2 MB.</p>
+          <p class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">New student accounts receive a random temporary password and must change it at first login. A one-time CSV containing issued credentials downloads after a successful import. Deliver it privately and delete your copy securely. Normal re-imports update profiles without changing existing passwords.</p>
           <form id="student-import-form" enctype="multipart/form-data">
-            <input type="file" name="students_csv" accept=".csv" required class="block w-full text-sm text-gray-500" />
-            <button type="submit" class="mt-4 bg-green-600 text-white px-5 py-3 rounded-lg font-semibold">Import Students</button>
+            <input type="file" name="students_csv" accept=".csv,text/csv" required class="block w-full text-sm text-gray-500" />
+            <label class="mt-4 flex items-start gap-2 text-sm text-gray-700">
+              <input type="checkbox" name="reset_existing_passwords" value="1" class="mt-1" />
+              <span><strong>One-time onboarding:</strong> issue new temporary passwords to all existing student accounts in this CSV too. Use only when first loading the campus roster or responding to a credential exposure; this resets every matching student's password and signs all users out.</span>
+            </label>
+            <button type="submit" class="mt-4 bg-green-600 text-white px-5 py-3 rounded-lg font-semibold disabled:cursor-wait disabled:opacity-60">Import Students</button>
           </form>
           <div id="admin-import-result" class="mt-4 hidden"></div>
         </section>
@@ -1608,15 +1754,67 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     document.getElementById('student-import-form').addEventListener('submit', async event => {
       event.preventDefault();
-      const formData = new FormData(event.currentTarget);
+      const form = event.currentTarget;
+      const fileInput = form.querySelector('input[name="students_csv"]');
+      const submitButton = form.querySelector('button[type="submit"]');
+      const resultTarget = document.getElementById('admin-import-result');
+      const file = fileInput.files[0];
+      if (!file || !file.name.toLowerCase().endsWith('.csv') || file.size > 2 * 1024 * 1024) {
+        showMessage(resultTarget, 'Choose a CSV file smaller than 2 MB.', 'error');
+        return;
+      }
+      const resetExistingPasswords = form.querySelector('[name="reset_existing_passwords"]').checked;
+      if (resetExistingPasswords && !window.confirm('This will replace the password of every existing student account represented in this CSV and download new temporary credentials. Continue only if you are ready to distribute them securely.')) {
+        return;
+      }
+      submitButton.disabled = true;
+      submitButton.textContent = 'Importing...';
+      showMessage(resultTarget, 'Validating and importing student records...', 'text-blue-700 bg-blue-50');
+      const formData = new FormData(form);
       formData.append('csrf_token', state.csrfToken);
       try {
         const response = await fetch('/api/index.php?endpoint=import_students.php', { method: 'POST', body: formData });
         const result = await response.json();
-        showMessage(document.getElementById('admin-import-result'), result.message || 'Import complete.', result.success ? 'success' : 'error');
+        showMessage(resultTarget, result.message || 'Import complete.', result.success ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50');
+        if (result.errors?.length) {
+          const errors = document.createElement('ul');
+          errors.className = 'mt-2 list-inside list-disc';
+          result.errors.forEach(error => {
+            const item = document.createElement('li');
+            item.textContent = `Row ${error.row}${error.sap_id ? ` (SAP ${error.sap_id})` : ''}: ${error.message}`;
+            errors.appendChild(item);
+          });
+          if (result.error_count > result.errors.length) {
+            const remaining = document.createElement('li');
+            remaining.textContent = `${result.error_count - result.errors.length} additional row error(s) omitted.`;
+            errors.appendChild(remaining);
+          }
+          resultTarget.appendChild(errors);
+        }
+        if (result.success && result.temporary_credentials?.length) {
+          const csvCell = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
+          const rows = [
+            ['SAP ID', 'Temporary Password'].map(csvCell).join(','),
+            ...result.temporary_credentials.map(account => [account.sap_id, account.temporary_password].map(csvCell).join(','))
+          ];
+          const blob = new Blob([`\uFEFF${rows.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `student-temporary-credentials-${new Date().toISOString().slice(0, 10)}.csv`;
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          const notice = document.createElement('p');
+          notice.className = 'mt-3 font-semibold text-amber-800';
+          notice.textContent = `Downloaded temporary credentials for ${result.temporary_credentials.length} account(s).`;
+          resultTarget.appendChild(notice);
+        }
       } catch (error) {
         console.error(error);
-        showMessage(document.getElementById('admin-import-result'), 'Import failed.', 'error');
+        showMessage(resultTarget, 'Import request failed. Check the network response before retrying; a completed import may already have committed.', 'text-red-700 bg-red-50');
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Import Students';
       }
     });
   }
@@ -1658,6 +1856,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('cancel-change-password')?.addEventListener('click', closeChangePasswordModal);
   document.getElementById('close-change-password-modal')?.addEventListener('click', closeChangePasswordModal);
+  document.getElementById('forced-change-logout')?.addEventListener('click', logoutUser);
   document.getElementById('change-password-form')?.addEventListener('submit', handleChangePassword);
   document.getElementById('student-forgot-password-button')?.addEventListener('click', openForgotPasswordModal);
   document.getElementById('close-forgot-password-modal')?.addEventListener('click', closeForgotPasswordModal);
