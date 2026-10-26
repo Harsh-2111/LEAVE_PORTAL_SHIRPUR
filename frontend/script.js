@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const logoutModal = document.getElementById('logout-confirm-modal');
   const changePasswordModal = document.getElementById('change-password-modal');
   const forgotPasswordModal = document.getElementById('forgot-password-modal');
+  const activationPage = document.getElementById('student-activation-page');
   const state = { csrfToken: '', user: null, wardenApprovedTotal: 0, forgotResetToken: '', forgotCsrfToken: '' };
   let loginProgressTimer = null;
   let wardenAttendanceTimer = null;
@@ -23,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let wardenFollowupPage = 1;
   let wardenFollowupTotal = 0;
   let wardenApprovedPage = 1;
+  let studentActivationToken = '';
 
   function openChangePasswordModal() {
     if (!changePasswordModal) return;
@@ -189,6 +191,57 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!element) return;
     element.textContent = '';
     element.classList.add('hidden');
+  }
+
+  async function handleStudentActivation(event) {
+    event.preventDefault();
+    const form = document.getElementById('student-activation-form');
+    const message = document.getElementById('student-activation-message');
+    const button = document.getElementById('student-activation-submit');
+    const password = document.getElementById('activation-password').value;
+    const confirmation = document.getElementById('activation-password-confirm').value;
+    if (password.length < 8 || password.length > 72) {
+      showMessage(message, 'Choose a password between 8 and 72 characters long.', 'text-red-700 bg-red-50');
+      return;
+    }
+    if (password !== confirmation) {
+      showMessage(message, 'Password and confirmation do not match.', 'text-red-700 bg-red-50');
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = 'Activating...';
+    const formData = new FormData();
+    formData.append('token', studentActivationToken);
+    formData.append('new_password', password);
+    formData.append('confirm_password', confirmation);
+    try {
+      const response = await fetch('/api/index.php?endpoint=activate_student.php', { method: 'POST', body: formData });
+      const responseText = await response.text();
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch {
+        throw new Error(`Activation service returned an unreadable response (HTTP ${response.status}).`);
+      }
+      if (!response.ok || !result.success) {
+        showMessage(message, result.message || `Activation failed (HTTP ${response.status}).`, 'text-red-700 bg-red-50');
+        return;
+      }
+      showMessage(message, result.message, 'text-green-700 bg-green-50');
+      form.classList.add('hidden');
+      const loginLink = document.createElement('a');
+      loginLink.href = '/frontend/index.html';
+      loginLink.textContent = 'Return to sign in';
+      loginLink.className = 'mt-4 block text-center font-semibold text-blue-700 underline';
+      activationPage.appendChild(loginLink);
+    } catch (error) {
+      console.error(error);
+      showMessage(message, error.message || 'Activation failed. Ask the administrator to resend the link.', 'text-red-700 bg-red-50');
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Set password and activate';
+    }
   }
 
   function createPaginationControls(page, total, pageSize, onPageChange) {
@@ -1738,13 +1791,13 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <section class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
           <h2 class="text-2xl font-semibold text-gray-700 mb-4">Import Students CSV</h2>
-          <p class="text-sm text-gray-600 mb-3"><a href="/frontend/student_template.csv" class="text-blue-600 underline">Student CSV template</a>. Export an UTF-8 CSV from Excel; XLSX files are not accepted. Maximum 2,500 rows and 2 MB.</p>
-          <p class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">New student accounts receive a random temporary password and must change it at first login. A one-time CSV containing issued credentials downloads after a successful import. Deliver it privately and delete your copy securely. Normal re-imports update profiles without changing existing passwords.</p>
+          <p class="text-sm text-gray-600 mb-3"><a href="/frontend/student_activation_template.csv" class="text-blue-600 underline">Student activation CSV template</a>. Export an UTF-8 CSV from Excel; XLSX files are not accepted. Maximum 2,500 rows and 2 MB. Every new student needs a valid @nmims.in email address.</p>
+          <p class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">New student accounts receive an email with a one-time activation link. They choose their own password; the app never emails a password. Normal roster re-imports update profiles without changing existing passwords or sending another email.</p>
           <form id="student-import-form" enctype="multipart/form-data">
             <input type="file" name="students_csv" accept=".csv,text/csv" required class="block w-full text-sm text-gray-500" />
             <label class="mt-4 flex items-start gap-2 text-sm text-gray-700">
-              <input type="checkbox" name="reset_existing_passwords" value="1" class="mt-1" />
-              <span><strong>One-time onboarding:</strong> issue new temporary passwords to all existing student accounts in this CSV too. Use only when first loading the campus roster or responding to a credential exposure; this resets every matching student's password and signs all users out.</span>
+              <input type="checkbox" name="resend_pending_invitations" value="1" class="mt-1" />
+              <span><strong>Resend activation links:</strong> send a fresh link only to accounts in this CSV that are still waiting for activation. Their old link will stop working; this does not reset passwords for activated students.</span>
             </label>
             <button type="submit" class="mt-4 bg-green-600 text-white px-5 py-3 rounded-lg font-semibold disabled:cursor-wait disabled:opacity-60">Import Students</button>
           </form>
@@ -1763,8 +1816,8 @@ document.addEventListener('DOMContentLoaded', () => {
         showMessage(resultTarget, 'Choose a CSV file smaller than 2 MB.', 'error');
         return;
       }
-      const resetExistingPasswords = form.querySelector('[name="reset_existing_passwords"]').checked;
-      if (resetExistingPasswords && !window.confirm('This will replace the password of every existing student account represented in this CSV and download new temporary credentials. Continue only if you are ready to distribute them securely.')) {
+      const resendPendingInvitations = form.querySelector('[name="resend_pending_invitations"]').checked;
+      if (resendPendingInvitations && !window.confirm('Send a fresh activation link to matching student accounts that have not activated yet? Their previous links will stop working.')) {
         return;
       }
       submitButton.disabled = true;
@@ -1804,24 +1857,6 @@ document.addEventListener('DOMContentLoaded', () => {
           resultTarget.appendChild(errors);
         }
         if (!importSucceeded) return;
-        if (result.temporary_credentials?.length) {
-          const csvCell = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
-          const rows = [
-            ['SAP ID', 'Temporary Password'].map(csvCell).join(','),
-            ...result.temporary_credentials.map(account => [account.sap_id, account.temporary_password].map(csvCell).join(','))
-          ];
-          const blob = new Blob([`\uFEFF${rows.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `student-temporary-credentials-${new Date().toISOString().slice(0, 10)}.csv`;
-          link.click();
-          setTimeout(() => URL.revokeObjectURL(url), 1000);
-          const notice = document.createElement('p');
-          notice.className = 'mt-3 font-semibold text-amber-800';
-          notice.textContent = `Downloaded temporary credentials for ${result.temporary_credentials.length} account(s).`;
-          resultTarget.appendChild(notice);
-        }
       } catch (error) {
         console.error(error);
         showMessage(resultTarget, `${error.message || 'Import request failed.'} Do not upload again until you confirm whether these students were added.`, 'text-red-700 bg-red-50');
@@ -1875,9 +1910,18 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('close-forgot-password-modal')?.addEventListener('click', closeForgotPasswordModal);
   document.getElementById('forgot-password-identity-form')?.addEventListener('submit', handleForgotPasswordIdentity);
   document.getElementById('forgot-password-reset-form')?.addEventListener('submit', handleForgotPasswordReset);
+  document.getElementById('student-activation-form')?.addEventListener('submit', handleStudentActivation);
   document.getElementById('confirm-logout').addEventListener('click', logoutUser);
   document.getElementById('cancel-logout').addEventListener('click', () => logoutModal.classList.add('hidden'));
   updateRoleTitle();
-  showLogin();
-  restoreSession();
+  const activationToken = new URLSearchParams(window.location.hash.slice(1)).get('activate');
+  if (activationToken) {
+    studentActivationToken = activationToken;
+    window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
+    appContainer.classList.add('hidden');
+    activationPage.classList.remove('hidden');
+  } else {
+    showLogin();
+    restoreSession();
+  }
 });
