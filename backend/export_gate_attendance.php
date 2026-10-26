@@ -37,7 +37,7 @@ $columns = $type === 'left'
     ? ['SAP ID', 'Student Name', 'Hostel Block', 'Room No', 'Parent Phone', 'Destination', 'Reason', 'Gate Exit Time', 'Scheduled Return']
     : ['SAP ID', 'Student Name', 'Hostel Block', 'Room No', 'Parent Phone', 'Destination', 'Gate Exit Time', 'Scheduled Return', 'Gate Entry Time', 'Return Timing Status', 'Variance (Late/Early Details)'];
 
-$sql = 'SELECT lr.sap_id, s.name AS student_name, s.hostel_block, s.room_no, '
+$sql = 'SELECT lr.sap_id, s.name AS student_name, s.hostel_block, COALESCE(lr.room_no, s.room_no) AS room_no, '
     . 's.parent_contact AS parent_phone, lr.hostel AS destination, lr.reason, '
     . 'lr.gate_out_time, lr.end_date, lr.gate_in_time, lr.return_timing_status, lr.variance_summary '
     . 'FROM leave_requests lr INNER JOIN students s ON s.sap_id = lr.sap_id '

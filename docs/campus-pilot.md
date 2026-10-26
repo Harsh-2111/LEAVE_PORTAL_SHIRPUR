@@ -10,11 +10,13 @@
 
 ## Database update
 
-The student importer uses temporary passwords and does not need a new database migration. If you already ran the previous activation migration, leave its unused student email column and token table in place; do not rerun or manually drop them.
+Run `database/migration_leave_request_room_postgres.sql` once in Supabase SQL Editor before deploying this version. It adds a nullable room field to leave requests so students can enter their room when applying. For MySQL, use `database/migration_leave_request_room_mysql.sql`.
+
+The student importer uses temporary passwords and does not need an activation migration. If you already ran the previous activation migration, leave its unused student email column and token table in place; do not rerun or manually drop them.
 
 ## Roster import
 
-The Admin importer accepts UTF-8 CSV only (not `.xlsx`), up to 2,500 data rows and 2 MB per upload. In Excel, use **Save As → CSV UTF-8**. Check that SAP IDs and phone numbers remain intact; format these columns as text if Excel removes leading zeroes. Use the header row from `frontend/student_password_template.csv`.
+The Admin importer accepts UTF-8 CSV only (not `.xlsx`), up to 2,500 data rows and 2 MB per upload. In Excel, use **Save As → CSV UTF-8**. Check that SAP IDs and parent phone numbers remain intact; format these columns as text if Excel removes leading zeroes. Use the header row from `frontend/student_password_template.csv`. Student phone, batch, and room number are optional and can be omitted.
 
 Valid records are committed in one transaction. Invalid rows are skipped and reported by CSV row number. A normal roster re-import updates profiles without changing existing student passwords. A SAP ID already used by a staff account is rejected instead of changing that account's role.
 

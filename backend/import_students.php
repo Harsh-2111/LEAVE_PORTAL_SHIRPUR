@@ -44,7 +44,7 @@ if (
 }
 
 $columnMap = [
-    'sap_id' => ['sap_id', 'sapid', 'student_id', 'sap id'],
+    'sap_id' => ['sap_id', 'sapid', 'student_id', 'sap id', 'student number', 'student_number'],
     'name' => ['name', 'student_name', 'full_name', 'student name'],
     'student_contact' => ['student_contact', 'student_phone', 'student mobile', 'student phone'],
     'gender' => ['gender', 'student_gender'],
@@ -55,8 +55,8 @@ $columnMap = [
     'hostel_block' => ['hostel_block', 'block', 'hostel block'],
     'room_no' => ['room_no', 'room', 'room number'],
     'parent_name' => ['parent_name', 'father_name', 'guardian_name'],
-    'parent_email' => ['parent_email', 'guardian_email', 'email'],
-    'parent_contact' => ['parent_contact', 'parent_phone', 'guardian_phone', 'contact_number'],
+    'parent_email' => ['parent_email', 'guardian_email', 'email', 'father e mail', 'father email'],
+    'parent_contact' => ['parent_contact', 'parent_phone', 'guardian_phone', 'contact_number', 'father mobile no', 'father mobile number'],
 ];
 $normalize = static function (string $value): string {
     $value = strtolower(trim($value));
@@ -95,7 +95,7 @@ foreach ($columnMap as $field => $aliases) {
 }
 
 $missingColumns = [];
-foreach (['sap_id', 'name', 'student_contact', 'gender', 'course', 'year', 'branch', 'batch', 'parent_email', 'parent_contact'] as $requiredField) {
+foreach (['sap_id', 'name', 'gender', 'course', 'year', 'branch', 'parent_email', 'parent_contact'] as $requiredField) {
     if (!isset($resolvedColumns[$requiredField])) {
         $missingColumns[] = $requiredField;
     }
@@ -163,7 +163,7 @@ while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
     }
     $branch = $record['branch'] ?? '';
     $batch = $record['batch'] ?? '';
-    $studentContact = $record['student_contact'] ?? '';
+    $studentContact = trim($record['student_contact'] ?? '');
     $gender = strtolower($record['gender'] ?? '');
     $courseInput = (string)preg_replace('/[^a-z]/', '', strtolower($record['course'] ?? ''));
     $course = $courseMap[$courseInput] ?? '';
@@ -171,18 +171,16 @@ while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
     $parentContact = $record['parent_contact'] ?? '';
     $parentName = $record['parent_name'] ?? '';
     $hostelBlock = $record['hostel_block'] ?? '';
-    $roomNo = $record['room_no'] ?? '';
     $hasOversizedField = strlen($studentName) > 150
         || strlen($branch) > 100
         || strlen($batch) > 50
         || strlen($hostelBlock) > 50
-        || strlen($roomNo) > 50
         || strlen($parentName) > 150
         || strlen($parentEmail) > 255;
 
     if (
         $studentName === '' || $hasOversizedField || $year === ''
-        || $branch === '' || $batch === '' || $studentContact === ''
+        || $branch === ''
         || !in_array($gender, ['male', 'female'], true) || $course === ''
     ) {
         $addError($lineNumber, $sapId, 'Required fields are missing or too long, or the year, gender, or course is invalid.');
@@ -190,7 +188,7 @@ while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
     }
     if (
         !filter_var($parentEmail, FILTER_VALIDATE_EMAIL)
-        || !preg_match('/^[0-9+() -]{7,20}$/', $studentContact)
+        || ($studentContact !== '' && !preg_match('/^[0-9+() -]{7,20}$/', $studentContact))
         || !preg_match('/^[0-9+() -]{7,20}$/', $parentContact)
     ) {
         $addError($lineNumber, $sapId, 'Student phone, parent email, or parent contact is invalid.');
@@ -201,14 +199,13 @@ while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
     $records[$sapId] = [
         'sap_id' => $sapId,
         'name' => $studentName,
-        'student_contact' => $studentContact,
+        'student_contact' => $studentContact === '' ? null : $studentContact,
         'gender' => $gender,
         'course' => $course,
         'year' => $year,
         'branch' => $branch,
         'batch' => $batch,
         'hostel_block' => $hostelBlock,
-        'room_no' => $roomNo,
         'parent_name' => $parentName,
         'parent_email' => $parentEmail,
         'parent_contact' => $parentContact,
@@ -285,7 +282,7 @@ foreach ($records as $sapId => $record) {
 $chunkSize = 100;
 $studentColumns = [
     'sap_id', 'name', 'student_contact', 'gender', 'course', 'year', 'branch', 'batch',
-    'hostel_block', 'room_no', 'parent_name', 'parent_email', 'parent_contact',
+    'hostel_block', 'parent_name', 'parent_email', 'parent_contact',
 ];
 $studentPlaceholders = '(' . implode(', ', array_fill(0, count($studentColumns), '?'))
     . ', ' . (DB_DRIVER === 'pgsql' ? 'TRUE' : '1') . ', NOW())';

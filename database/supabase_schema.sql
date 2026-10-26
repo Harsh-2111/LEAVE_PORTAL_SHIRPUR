@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS public.leave_requests (
   reason TEXT NOT NULL,
   school VARCHAR(10) CHECK (school IN ('MPSTME', 'SPTM')),
   hostel VARCHAR(40),
+  room_no VARCHAR(50),
   email_from VARCHAR(255),
   email_received_at TIMESTAMPTZ,
   parent_email_matched BOOLEAN NOT NULL DEFAULT FALSE,

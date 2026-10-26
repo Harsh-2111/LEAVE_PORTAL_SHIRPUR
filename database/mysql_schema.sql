@@ -56,6 +56,7 @@ CREATE TABLE `leave_requests` (
   `reason` TEXT NOT NULL,
   `school` ENUM('MPSTME','SPTM') DEFAULT NULL,
   `hostel` VARCHAR(40) DEFAULT NULL,
+  `room_no` VARCHAR(50) DEFAULT NULL,
   `email_from` VARCHAR(255) DEFAULT NULL,
   `email_received_at` DATETIME DEFAULT NULL,
   `parent_email_matched` TINYINT(1) NOT NULL DEFAULT 0,

@@ -21,7 +21,7 @@ if ($sapId === '' && $token === '') {
     exit;
 }
 
-$sql = 'SELECT lr.id, lr.sap_id, s.name AS student_name, s.gender, lr.status, lr.pass_token, lr.qr_code_data, lr.start_date, lr.end_date, lr.reason, lr.gate_out_time, lr.gate_in_time, lr.return_timing_status, lr.variance_summary FROM leave_requests lr INNER JOIN students s ON s.sap_id = lr.sap_id WHERE lr.status IN (\'Granted\', \'CHECKED_OUT\', \'CHECKED_IN\') AND lr.pass_token IS NOT NULL';
+$sql = 'SELECT lr.id, lr.sap_id, s.name AS student_name, s.gender, lr.room_no, lr.status, lr.pass_token, lr.qr_code_data, lr.start_date, lr.end_date, lr.reason, lr.gate_out_time, lr.gate_in_time, lr.return_timing_status, lr.variance_summary FROM leave_requests lr INNER JOIN students s ON s.sap_id = lr.sap_id WHERE lr.status IN (\'Granted\', \'CHECKED_OUT\', \'CHECKED_IN\') AND lr.pass_token IS NOT NULL';
 $params = [];
 
 if ($user['role'] === 'warden') {
@@ -96,6 +96,7 @@ $payload = [
     'leave_id' => (int)$record['id'],
     'sap_id' => $record['sap_id'],
     'student_name' => $record['student_name'],
+    'room_no' => $record['room_no'],
     'status' => $record['status'],
     'pass_token' => $record['pass_token'],
     'valid_qr' => $validQr,

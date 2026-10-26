@@ -404,7 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <input id="student-profile-name" type="text" readonly required class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
             </label>
             <label class="block text-sm font-medium text-gray-700">Student phone number
-              <input id="student-profile-contact" type="tel" readonly required class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
+              <input id="student-profile-contact" type="tel" readonly class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
             </label>
             <label class="block text-sm font-medium text-gray-700">Parent email
               <input id="student-profile-parent-email" type="email" readonly required class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
@@ -426,6 +426,9 @@ document.addEventListener('DOMContentLoaded', () => {
             </label>
             <label class="block text-sm font-medium text-gray-700">Hostel
               <select id="student-hostel" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg"></select>
+            </label>
+            <label class="block text-sm font-medium text-gray-700">Room number
+              <input id="student-room-number" type="text" maxlength="50" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg" />
             </label>
             <label class="block text-sm font-medium text-gray-700">Leave from
               <input id="student-leave-start" type="date" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg" />
@@ -500,7 +503,8 @@ document.addEventListener('DOMContentLoaded', () => {
         ? ['NEW GIRLS HOSTEL', 'OLD GIRLS HOSTEL']
         : ['BOYS HOSTEL 1', 'NEW BOYS HOSTEL'];
       hostelSelect.innerHTML = '<option value="">Select hostel</option>' + hostels.map(hostel => `<option value="${hostel}">${hostel}</option>`).join('');
-      const profileComplete = Object.values(fields).every(value => Boolean(value)) && Boolean(profile.gender && expectedSchool);
+      const requiredProfileFields = Object.entries(fields).filter(([id]) => id !== 'student-profile-contact');
+      const profileComplete = requiredProfileFields.every(([, value]) => Boolean(value)) && Boolean(profile.gender && expectedSchool);
       submitButton.disabled = !profileComplete;
       if (!profileComplete) {
         const message = document.getElementById('student-form-message');
@@ -562,6 +566,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reason: document.getElementById('student-leave-reason').value.trim(),
         school: schoolSelect.value,
         hostel: hostelSelect.value,
+        room_no: document.getElementById('student-room-number').value.trim(),
         details_confirmed: document.getElementById('student-details-confirmed').checked ? '1' : '0'
       });
       try {
@@ -573,6 +578,7 @@ document.addEventListener('DOMContentLoaded', () => {
           startInput.value = '';
           endInput.value = '';
           document.getElementById('student-leave-reason').value = '';
+          document.getElementById('student-room-number').value = '';
           document.getElementById('student-details-confirmed').checked = false;
           updateLeaveDays();
           await loadStudentHistory();
@@ -660,13 +666,13 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="overflow-x-auto">
           <table class="min-w-full bg-white border border-gray-300 rounded-lg">
             <thead class="bg-gray-200 text-gray-600 uppercase text-sm"><tr>
-              <th class="py-3 px-4 text-left">From</th><th class="py-3 px-4 text-left">To</th>
+              <th class="py-3 px-4 text-left">From</th><th class="py-3 px-4 text-left">To</th><th class="py-3 px-4 text-left">Room</th>
               <th class="py-3 px-4 text-left">Days</th><th class="py-3 px-4 text-left">School / Hostel</th>
               <th class="py-3 px-4 text-left">Reason</th><th class="py-3 px-4 text-left">Status</th><th class="py-3 px-4 text-left">Pass</th>
             </tr></thead>
             <tbody>${items.map(item => `
               <tr class="border-b border-gray-200 hover:bg-gray-100">
-                <td class="py-3 px-4">${item.start_date}</td><td class="py-3 px-4">${item.end_date}</td>
+                <td class="py-3 px-4">${item.start_date}</td><td class="py-3 px-4">${item.end_date}</td><td class="py-3 px-4">${item.room_no || '-'}</td>
                 <td class="py-3 px-4">${item.leave_days}</td><td class="py-3 px-4">${item.school || '-'} / ${item.hostel || '-'}</td>
                 <td class="py-3 px-4">${item.reason}</td><td class="py-3 px-4">${item.status}</td>
                 <td class="py-3 px-4">${item.status === 'Granted' && item.qr_code_data ? `<button type="button" class="bg-blue-600 text-white px-3 py-1 rounded" data-qrcode="${item.id}">View</button>` : '-'}</td>
@@ -998,6 +1004,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fields = [
           [`${item.name || ''} (${item.sap_id || ''})`, 'font-semibold'],
           [`${item.course || ''} | ${item.year || ''} | ${item.gender || ''}`, ''],
+          [`Room: ${item.room_no || '-'}`, ''],
           [`Dates: ${item.start_date} to ${item.end_date} (${item.leave_days} days)`, ''],
           [`School / Hostel: ${item.school || '-'} / ${item.hostel || '-'}`, ''],
           [`Reason: ${item.reason || '-'}`, ''],
@@ -1432,6 +1439,7 @@ document.addEventListener('DOMContentLoaded', () => {
     details.className = 'mt-4 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3';
     [
       ['SAP ID', result.sap_id],
+      ['Room number', result.room_no],
       ['Status', result.status],
       ['Valid from', result.start_date],
       ['Valid until', result.end_date],
@@ -1738,7 +1746,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <section class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
           <h2 class="text-2xl font-semibold text-gray-700 mb-4">Import Students CSV</h2>
-          <p class="text-sm text-gray-600 mb-3"><a href="/frontend/student_password_template.csv" class="text-blue-600 underline">Student CSV template</a>. Save as UTF-8 CSV from Excel; XLSX files are not accepted. Maximum 2,500 rows and 2 MB.</p>
+          <p class="text-sm text-gray-600 mb-3"><a href="/frontend/student_password_template.csv" class="text-blue-600 underline">Student CSV template</a>. Save as UTF-8 CSV from Excel; XLSX files are not accepted. Maximum 2,500 rows and 2 MB. Student phone, batch, and room number are not required in the roster.</p>
           <p class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">New students get a unique 8-character temporary password in the form stud@ plus 3 random digits. The app downloads a one-time CSV of SAP IDs and passwords after import. Students must change their password at first login. Share each password privately and delete the downloaded file securely.</p>
           <form id="student-import-form" enctype="multipart/form-data">
             <input type="file" name="students_csv" accept=".csv,text/csv" required class="block w-full text-sm text-gray-500" />

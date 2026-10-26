@@ -81,7 +81,7 @@ if ($search !== '') {
     $params[] = $term;
 }
 
-$sql = 'SELECT lr.id, lr.sap_id, s.name, s.gender, s.course, s.year, s.branch, s.batch, s.parent_email, s.parent_contact, lr.start_date, lr.end_date, lr.leave_days, lr.reason, lr.school, lr.hostel, lr.status, lr.email_from, lr.parent_email_matched, lr.granted_by, lr.granted_at, lr.created_at FROM leave_requests lr INNER JOIN students s ON s.sap_id = lr.sap_id';
+$sql = 'SELECT lr.id, lr.sap_id, s.name, s.gender, s.course, s.year, s.branch, s.batch, s.parent_email, s.parent_contact, lr.room_no, lr.start_date, lr.end_date, lr.leave_days, lr.reason, lr.school, lr.hostel, lr.status, lr.email_from, lr.parent_email_matched, lr.granted_by, lr.granted_at, lr.created_at FROM leave_requests lr INNER JOIN students s ON s.sap_id = lr.sap_id';
 if (!empty($where)) {
     $sql .= ' WHERE ' . implode(' AND ', $where);
 }

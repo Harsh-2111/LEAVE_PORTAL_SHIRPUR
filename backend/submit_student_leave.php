@@ -18,6 +18,7 @@ $endDate = trim((string)($_POST['end_date'] ?? ''));
 $reason = trim((string)($_POST['reason'] ?? ''));
 $school = trim((string)($_POST['school'] ?? ''));
 $hostel = trim((string)($_POST['hostel'] ?? ''));
+$roomNo = trim((string)($_POST['room_no'] ?? ''));
 $detailsConfirmed = ($_POST['details_confirmed'] ?? '') === '1';
 
 if ($sapId !== $user['login_id']) {
@@ -44,6 +45,12 @@ if (!preg_match($datePattern, $startDate) || !preg_match($datePattern, $endDate)
 if ($reason === '' || strlen($reason) > 2000) {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => 'Enter a reason of up to 2,000 characters.']);
+    exit;
+}
+
+if ($roomNo === '' || strlen($roomNo) > 50) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Enter a room number of up to 50 characters.']);
     exit;
 }
 
@@ -76,12 +83,12 @@ if ($overlap->fetch()) {
 
 $leaveDays = (int)$start->diff($end)->format('%a') + 1;
 $insertSql = DB_DRIVER === 'pgsql'
-    ? 'INSERT INTO leave_requests (sap_id, start_date, end_date, leave_days, reason, school, hostel, email_from, email_received_at, parent_email_matched, logged_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, FALSE, ?, \'Pending Verification\', NOW()) RETURNING id'
-    : 'INSERT INTO leave_requests (sap_id, start_date, end_date, leave_days, reason, school, hostel, email_from, email_received_at, parent_email_matched, logged_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, 0, ?, \'Pending Verification\', NOW())';
+    ? 'INSERT INTO leave_requests (sap_id, start_date, end_date, leave_days, reason, school, hostel, room_no, email_from, email_received_at, parent_email_matched, logged_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, FALSE, ?, \'Pending Verification\', NOW()) RETURNING id'
+    : 'INSERT INTO leave_requests (sap_id, start_date, end_date, leave_days, reason, school, hostel, room_no, email_from, email_received_at, parent_email_matched, logged_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 0, ?, \'Pending Verification\', NOW())';
 $insert = $pdo->prepare($insertSql);
-$insert->execute([$sapId, $startDate, $endDate, $leaveDays, $reason, $school, $hostel, (int)$user['id']]);
+$insert->execute([$sapId, $startDate, $endDate, $leaveDays, $reason, $school, $hostel, $roomNo, (int)$user['id']]);
 $leaveId = DB_DRIVER === 'pgsql' ? (int)$insert->fetchColumn() : (int)$pdo->lastInsertId();
 
-writeAudit($pdo, (int)$user['id'], 'submit_student_leave', 'leave_requests', $leaveId, ['sap_id' => $sapId, 'school' => $school, 'hostel' => $hostel], $_SERVER['REMOTE_ADDR'] ?? null);
+writeAudit($pdo, (int)$user['id'], 'submit_student_leave', 'leave_requests', $leaveId, ['sap_id' => $sapId, 'school' => $school, 'hostel' => $hostel, 'room_no' => $roomNo], $_SERVER['REMOTE_ADDR'] ?? null);
 
 echo json_encode(['success' => true, 'leave_id' => $leaveId, 'message' => 'Leave request submitted to the warden for parent-call verification.']);

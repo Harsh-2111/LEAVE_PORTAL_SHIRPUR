@@ -60,7 +60,7 @@ switch ($filter) {
         break;
 }
 
-$sql = 'SELECT lr.id, lr.sap_id, s.name AS student_name, s.room_no, s.hostel_block, '
+$sql = 'SELECT lr.id, lr.sap_id, s.name AS student_name, COALESCE(lr.room_no, s.room_no) AS room_no, s.hostel_block, '
     . 'lr.hostel AS destination, s.parent_contact AS parent_phone, lr.reason, lr.end_date, '
     . 'lr.gate_out_time, lr.gate_in_time, lr.return_timing_status, lr.variance_summary, '
     . 'CASE '
