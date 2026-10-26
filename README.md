@@ -95,14 +95,14 @@ Students sign in with their SAP ID, submit a leave request, and see its status i
 
 If a parent cannot be reached or the person answering is not the parent, the warden must enter a reason. The leave remains `Pending Verification` for the student but moves out of the Warden's main pending list into **Show Not Reached/Wrong person Leave**. From that follow-up table, a warden can approve or reject the request; a reason is required for either resolution. Approval grants the request and creates its gate pass; rejection changes its status to `Rejected`. Each call attempt and its remarks are retained in the call log.
 
-The admin CSV import uses the columns in `frontend/student_template.csv`, including student contact, gender, course, year, parent email, and parent contact. Imported students receive an initial password `Student@` plus the last four digits of their SAP ID.
+The Admin importer uses the activation CSV template at `frontend/student_activation_template.csv`. Each new student must have an official `@nmims.in` address. New accounts receive a one-time activation email so students can choose their own password; the app does not email passwords. See `docs/campus-pilot.md` for the email-provider setup and safe import procedure.
 
 ### Existing database volume
 
-The MySQL entrypoint scripts run only when the database volume is first initialized. To apply the additive v3 migration to an existing volume, run this once from the project directory:
+The MySQL entrypoint scripts run only when the database volume is first initialized. To apply the student profile migration to an existing volume, run this once from the project directory:
 
 ```powershell
-Get-Content -Raw .\database\hostel_leave_migration_v3.sql | docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" hostel_leave'
+Get-Content -Raw .\database\migration_student_profiles_mysql.sql | docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" hostel_leave'
 ```
 
 This migration preserves existing requests and adds the new profile and warden-group fields. Existing non-demo student records need their new profile values populated through the updated CSV import before those students can submit requests.
@@ -110,10 +110,12 @@ This migration preserves existing requests and adds the new profile and warden-g
 Apply the additive gate attendance migration to an existing MySQL volume:
 
 ```powershell
-Get-Content -Raw .\database\hostel_leave_migration_v4.sql | docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" hostel_leave'
+Get-Content -Raw .\database\migration_gate_attendance_mysql.sql | docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" hostel_leave'
 ```
 
-For an existing Supabase database, run `database/hostel_leave_migration_v4_postgres.sql` in the Supabase SQL Editor. New installations receive the gate columns and status values from the corresponding schema file.
+For an existing Supabase database, run `database/migration_gate_attendance_postgres.sql` in the Supabase SQL Editor. New installations receive the gate columns and status values from the corresponding schema file.
+
+For the student activation feature, run `database/migration_student_activation_postgres.sql` in the Supabase SQL Editor, or `database/migration_student_activation_mysql.sql` for MySQL. Configure `RESEND_API_KEY`, `ACTIVATION_FROM_EMAIL`, and `APP_BASE_URL` in the hosting environment before sending invitations. The sender address must use an authorized, verified domain. See `docs/campus-pilot.md` for details.
 
 ## Production checklist
 

@@ -10,7 +10,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script> 
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <!-- jsPDF library for PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body class="font-inter bg-gray-100 min-h-screen flex items-center justify-center p-4">
@@ -148,21 +147,17 @@
                 <p id="attendance-warning" class="text-sm text-orange-600 mt-2 hidden">Your attendance is below 80%. You might need to talk with your Mentor about this.</p>
             </div>
 
-            <!-- MODIFICATION START: Parent's Email ID -->
             <div class="mb-4">
                 <label for="parent-email" class="block text-gray-700 text-sm font-medium mb-2">Parent's Email ID:</label>
                 <input type="email" id="parent-email" placeholder="parent@example.com" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <p id="parent-email-validation-message" class="text-sm text-red-600 mt-2 hidden"></p>
             </div>
-            <!-- MODIFICATION END: Parent's Email ID -->
 
-            <!-- NEW ADDITION: Parent's Contact Number -->
             <div class="mb-4">
                 <label for="parent-contact" class="block text-gray-700 text-sm font-medium mb-2">Parent's Contact Number (10 digits):</label>
                 <input type="tel" id="parent-contact" placeholder="e.g., 9876543210" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" maxlength="10" pattern="[0-9]{10}">
                 <p id="parent-contact-validation-message" class="text-sm text-red-600 mt-2 hidden"></p>
             </div>
-            <!-- END NEW ADDITION: Parent's Contact Number -->
 
             <div class="flex gap-4 mb-4">
                 <div class="flex items-center">
@@ -275,12 +270,10 @@
                 <p id="gate-pass-message" class="text-green-700 mb-4"></p>
                 <div id="qr-code-display" class="flex justify-center mb-4">
                     </div>
-                <!-- NEW ADDITION: QR Download Warning -->
                 <p id="qr-download-warning" class="text-sm text-orange-600 text-center mb-4 hidden">
                     DOWNLOAD YOUR QR CODE ON DEVICE ONCE IT IS SEEN, IT MAY DISAPPEAR.
                 </p>
                 <button id="download-qr-button" class="w-full bg-blue-600 text-white p-3 rounded-lg font-semibold hover:bg-blue-700 transition duration-300 shadow-md">Download Your Gate Pass QR Code</button>
-                <!-- NEW ADDITION: PDF Download Button -->
                 <button id="download-pdf-button" class="w-full bg-purple-600 text-white p-3 rounded-lg font-semibold hover:bg-purple-700 transition duration-300 shadow-md mt-4">Download Your Gate Pass PDF</button>
                 <p id="qr-error-message" class="text-sm text-red-600 mt-2 hidden"></p>
             </div>
@@ -297,7 +290,6 @@
         <div id="security-page" class="hidden"></div>
     </div>
 
-    <!-- Custom Logout Confirmation Modal -->
     <div id="logout-confirm-modal" class="fixed inset-0 hidden bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full text-center">
             <h2 class="text-lg font-semibold mb-4">Do you want to logout?</h2>

@@ -10,9 +10,9 @@
 
 ## Database update
 
-For an existing PostgreSQL/Supabase installation, apply `database/hostel_leave_migration_v7_student_activation_postgres.sql` in the Supabase SQL editor before using the activation-email importer. It adds the student email field and one-time token table. If you created a new database from the updated `supabase_schema.sql`, you do not need this migration.
+For an existing PostgreSQL/Supabase installation, apply `database/migration_student_activation_postgres.sql` in the Supabase SQL editor before using the activation-email importer. It adds the student email field and one-time token table. If you created a new database from the updated `supabase_schema.sql`, you do not need this migration.
 
-For an existing MySQL installation, use `database/hostel_leave_migration_v7_student_activation.sql` once instead. New installations from the updated MySQL schema already include these objects.
+For an existing MySQL installation, use `database/migration_student_activation_mysql.sql` once instead. New installations from the updated MySQL schema already include these objects.
 
 ## Roster import
 

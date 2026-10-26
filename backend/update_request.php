@@ -1,5 +1,4 @@
 <?php
-// update_request.php
 require_once __DIR__ . '/db.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -9,7 +8,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $id = intval($_POST['id'] ?? 0);
-$action = $_POST['action'] ?? ''; // 'approve' or 'reject'
+$action = $_POST['action'] ?? '';
 $role = $_POST['role'] ?? '';
 $name = $_POST['name'] ?? '';
 
@@ -19,7 +18,6 @@ if (!$id || !$action || !$role || !$name) {
     exit;
 }
 
-// Fetch current request
 $stmt = $conn->prepare("SELECT * FROM leave_requests WHERE id = ? LIMIT 1");
 $stmt->bind_param('i', $id);
 $stmt->execute();
@@ -42,30 +40,21 @@ if ($action === 'reject') {
 }
 
 if ($action === 'approve') {
-    // Behavior depends on role:
     if ($role === 'teacher') {
-        // set teacher_approved true and status = 'Teacher Approved'
         $u = $conn->prepare("UPDATE leave_requests SET teacher_approved = 1, status = 'Teacher Approved' WHERE id = ?");
         $u->bind_param('i', $id); $u->execute(); $u->close();
         echo json_encode(['success' => true, 'message' => 'Teacher approved, sent to HOD']);
         exit;
     } elseif ($role === 'hod') {
-        // set hod_approved true. If leave_days > 3 then set status = 'HOD Approved' (send to Dean), else set Granted and create qr_code_data
         $leave_days = intval($req['leave_days']);
-        
-        // Define Dean Name
-        $dean_name = 'Dean of Academics'; // Used for assignment to the Dean
+        $dean_name = 'Dean of Academics';
 
         if ($leave_days > 3) {
-            // HOD approved - requires Dean approval
             $u = $conn->prepare("UPDATE leave_requests SET hod_approved = 1, status = 'HOD Approved', dean_assigned = ? WHERE id = ?");
             $u->bind_param('si', $dean_name, $id); $u->execute(); $u->close();
             echo json_encode(['success' => true, 'message' => 'HOD approved — requires Dean approval (leave > 3 days)']);
             exit;
         } else {
-            // Grant the leave: set hod_approved and status = 'Granted', create qr_code_data
-            
-            // --- HOD QR DATA GENERATION (LABELS ADDED) ---
             $timestamp = round(microtime(true) * 1000);
             $qr_data = "GATE PASS\n"
                      . "Student ID: " . $req['student_id'] . "\n"
@@ -74,27 +63,20 @@ if ($action === 'approve') {
                      . "Till: " . $req['end_date'] . "\n"
                      . "Approved by Mentor: " . $req['teacher'] . "\n"
                      . "Generated: " . $timestamp;
-            // ---------------------------------------------
-            
             $u = $conn->prepare("UPDATE leave_requests SET hod_approved = 1, status = 'Granted', qr_code_data = ? WHERE id = ?");
             $u->bind_param('si', $qr_data, $id); $u->execute(); $u->close();
             echo json_encode(['success' => true, 'message' => 'HOD approved and leave granted (no Dean required)']);
             exit;
         }
     } elseif ($role === 'dean') {
-        // Dean approves => set dean_approved true and status = 'Granted' and qr_code_data
-
-        // --- DEAN QR DATA GENERATION (LABELS ADDED) ---
         $timestamp = round(microtime(true) * 1000);
         $qr_data = "GATE PASS\n"
                  . "Student ID: " . $req['student_id'] . "\n"
                  . "Name: " . $req['student_name'] . "\n"
                  . "From: " . $req['start_date'] . "\n"
                  . "Till: " . $req['end_date'] . "\n"
-                 . "Approved by Mentor: " . $req['teacher'] . "\n" // Use the mentor's name
+                 . "Approved by Mentor: " . $req['teacher'] . "\n"
                  . "Generated: " . $timestamp;
-        // ---------------------------------------------
-        
         $u = $conn->prepare("UPDATE leave_requests SET dean_approved = 1, status = 'Granted', qr_code_data = ? WHERE id = ?");
         $u->bind_param('si', $qr_data, $id); $u->execute(); $u->close();
         echo json_encode(['success' => true, 'message' => 'Dean approved and leave granted']);
