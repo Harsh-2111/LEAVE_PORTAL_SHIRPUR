@@ -13,7 +13,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $user = requireRole(['admin']);
 requireCsrfToken();
-$resetExistingPasswords = ($_POST['reset_existing_passwords'] ?? '') === '1';
 
 $upload = $_FILES['students_csv'] ?? null;
 if (!is_array($upload) || $upload['error'] !== UPLOAD_ERR_OK) {
@@ -254,31 +253,6 @@ if ($records === []) {
     exit;
 }
 
-$credentialAccounts = [];
-$usedTemporaryPasswords = [];
-foreach ($records as $sapId => $record) {
-    if (!isset($accounts[$sapId]) || $resetExistingPasswords) {
-        if (count($usedTemporaryPasswords) >= 1000) {
-            http_response_code(422);
-            echo json_encode([
-                'success' => false,
-                'imported' => 0,
-                'message' => 'This import needs more than 1,000 temporary passwords. Split it into smaller imports or use a stronger password format.',
-            ]);
-            exit;
-        }
-        do {
-            $temporaryPassword = 'stud@' . str_pad((string)random_int(0, 999), 3, '0', STR_PAD_LEFT);
-        } while (isset($usedTemporaryPasswords[$temporaryPassword]));
-        $usedTemporaryPasswords[$temporaryPassword] = true;
-        $credentialAccounts[$sapId] = [
-            'sap_id' => $sapId,
-            'temporary_password' => $temporaryPassword,
-            'password_hash' => password_hash($temporaryPassword, PASSWORD_BCRYPT, ['cost' => 5]),
-        ];
-    }
-}
-
 $chunkSize = 100;
 $studentColumns = [
     'sap_id', 'name', 'student_contact', 'gender', 'course', 'year', 'branch', 'batch',
@@ -310,91 +284,6 @@ try {
         $studentStmt->execute($params);
     }
 
-    $existingStudentIds = array_values(array_filter(
-        array_keys($records),
-        static fn(string $sapId): bool => isset($accounts[$sapId])
-    ));
-    $credentialAccountIds = array_keys($credentialAccounts);
-    $newAccountIds = array_values(array_filter(
-        $credentialAccountIds,
-        static fn(string $sapId): bool => !isset($accounts[$sapId])
-    ));
-    foreach (array_chunk($existingStudentIds, 100) as $ids) {
-        if ($ids === []) {
-            continue;
-        }
-        $caseParts = [];
-        $params = [];
-        foreach ($ids as $sapId) {
-            $caseParts[] = 'WHEN ? THEN ?';
-            $params[] = $sapId;
-            $params[] = $records[$sapId]['name'];
-        }
-        $assignments = 'name = CASE login_id ' . implode(' ', $caseParts) . ' ELSE name END';
-        if ($resetExistingPasswords) {
-            $passwordCases = [];
-            foreach ($ids as $sapId) {
-                $passwordCases[] = 'WHEN ? THEN ?';
-                $params[] = $sapId;
-                $params[] = $credentialAccounts[$sapId]['password_hash'];
-            }
-            $assignments .= ', password_hash = CASE login_id ' . implode(' ', $passwordCases)
-                . ' ELSE password_hash END, must_change_password = '
-                . (DB_DRIVER === 'pgsql' ? 'TRUE' : '1');
-        }
-        $placeholders = implode(', ', array_fill(0, count($ids), '?'));
-        $params = array_merge($params, $ids);
-        $updateUsers = $pdo->prepare(
-            'UPDATE users SET ' . $assignments . ', is_active = '
-            . (DB_DRIVER === 'pgsql' ? 'TRUE' : '1')
-            . ', updated_at = NOW()'
-            . " WHERE role = 'student' AND login_id IN ($placeholders)"
-        );
-        $updateUsers->execute($params);
-    }
-
-    foreach (array_chunk($newAccountIds, 100) as $ids) {
-        $params = [];
-        $userValues = [];
-        foreach ($ids as $sapId) {
-            $userValues[] = '(?, ?, ?, ?, ' . (DB_DRIVER === 'pgsql' ? 'TRUE' : '1') . ', ' . (DB_DRIVER === 'pgsql' ? 'TRUE' : '1') . ')';
-            $params[] = $sapId;
-            $params[] = $credentialAccounts[$sapId]['password_hash'];
-            $params[] = 'student';
-            $params[] = $records[$sapId]['name'];
-        }
-        $userSql = 'INSERT INTO users (login_id, password_hash, role, name, must_change_password, is_active) VALUES '
-            . implode(', ', $userValues)
-            . (DB_DRIVER === 'pgsql' ? ' ON CONFLICT (login_id) DO NOTHING' : ' ON DUPLICATE KEY UPDATE login_id = VALUES(login_id)');
-        $userStmt = $pdo->prepare($userSql);
-        $userStmt->execute($params);
-    }
-
-    foreach (array_chunk($credentialAccountIds, 300) as $ids) {
-        if ($ids === []) {
-            continue;
-        }
-        $placeholders = implode(', ', array_fill(0, count($ids), '?'));
-        $verifyStmt = $pdo->prepare("SELECT login_id, password_hash FROM users WHERE login_id IN ($placeholders)");
-        $verifyStmt->execute($ids);
-        $storedHashes = [];
-        foreach ($verifyStmt->fetchAll() as $row) {
-            $storedHashes[$row['login_id']] = $row['password_hash'];
-        }
-        foreach ($ids as $sapId) {
-            if (
-                !isset($storedHashes[$sapId])
-                || !password_verify($credentialAccounts[$sapId]['temporary_password'], $storedHashes[$sapId])
-            ) {
-                throw new RuntimeException('A temporary credential changed during import. No records were saved; retry the import.');
-            }
-        }
-    }
-
-    if ($resetExistingPasswords) {
-        $pdo->exec('DELETE FROM app_sessions');
-    }
-
     writeAudit(
         $pdo,
         (int)$user['id'],
@@ -403,8 +292,6 @@ try {
         null,
         [
             'imported' => count($records),
-            'new_accounts' => count($newAccountIds),
-            'existing_password_resets' => count($credentialAccountIds) - count($newAccountIds),
             'row_errors' => $errorCount,
         ],
         $_SERVER['REMOTE_ADDR'] ?? null
@@ -420,22 +307,11 @@ try {
     exit;
 }
 
-$credentialRows = array_map(
-    static fn(array $account): array => [
-        'sap_id' => $account['sap_id'],
-        'temporary_password' => $account['temporary_password'],
-    ],
-    array_values($credentialAccounts)
-);
-
 echo json_encode([
     'success' => true,
     'imported' => count($records),
-    'credential_accounts_count' => count($credentialAccounts),
-    'temporary_credentials' => $credentialRows,
     'errors' => $errors,
     'error_count' => $errorCount,
-    'message' => count($records) . ' student record(s) imported or updated.'
-        . ($resetExistingPasswords ? ' Temporary passwords were issued for all imported student accounts.' : ' Existing student passwords were not changed.')
+    'message' => count($records) . ' student record(s) imported or updated. Students can create their own account from the sign-in page.'
         . ($errorCount > 0 ? ' Some CSV rows were skipped; review the row errors.' : ''),
 ]);

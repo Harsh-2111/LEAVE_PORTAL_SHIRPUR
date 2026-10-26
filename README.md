@@ -95,7 +95,7 @@ Students sign in with their SAP ID, submit a leave request, and see its status i
 
 If a parent cannot be reached or the person answering is not the parent, the warden must enter a reason. The leave remains `Pending Verification` for the student but moves out of the Warden's main pending list into **Show Not Reached/Wrong person Leave**. From that follow-up table, a warden can approve or reject the request; a reason is required for either resolution. Approval grants the request and creates its gate pass; rejection changes its status to `Rejected`. Each call attempt and its remarks are retained in the call log.
 
-The Admin importer uses `frontend/student_password_template.csv`. Each new student receives a unique 8-character temporary password in the form `stud@` plus three random digits in a one-time CSV download, and must change it at first login. This format supports at most 1,000 unique temporary passwords per import. See `docs/campus-pilot.md` for safe password distribution.
+The Admin importer uses `frontend/student_roster_template.csv` to update student records only; it no longer creates passwords. Students sign up with their SAP ID and the matching parent contact and email from the roster, then create their own password (at least 8 characters). Existing imported accounts that still require a temporary-password change can be claimed through this signup flow. See `docs/campus-pilot.md` for safe onboarding guidance.
 
 ### Existing database volume
 

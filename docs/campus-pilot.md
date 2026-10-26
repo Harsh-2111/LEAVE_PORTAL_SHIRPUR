@@ -12,17 +12,17 @@
 
 Run `database/migration_leave_request_room_postgres.sql` once in Supabase SQL Editor before deploying this version. It adds a nullable room field to leave requests so students can enter their room when applying. For MySQL, use `database/migration_leave_request_room_mysql.sql`.
 
-The student importer uses temporary passwords and does not need an activation migration. If you already ran the previous activation migration, leave its unused student email column and token table in place; do not rerun or manually drop them.
+No additional database migration is required for student self-signup. The importer updates roster records only; it no longer creates or resets student passwords. Existing temporary-password accounts can be claimed through signup after the student's SAP ID and parent contact details are matched. If you already ran the previous activation migration, leave its unused student email column and token table in place; do not rerun or manually drop them.
 
 ## Roster import
 
-The Admin importer accepts UTF-8 CSV only (not `.xlsx`), up to 2,500 data rows and 2 MB per upload. In Excel, use **Save As → CSV UTF-8**. Check that SAP IDs and parent phone numbers remain intact; format these columns as text if Excel removes leading zeroes. Use the header row from `frontend/student_password_template.csv`. Student phone, batch, and room number are optional and can be omitted.
+The Admin importer accepts UTF-8 CSV only (not `.xlsx`), up to 2,500 data rows and 2 MB per upload. In Excel, use **Save As → CSV UTF-8**. Check that SAP IDs and parent phone numbers remain intact; format these columns as text if Excel removes leading zeroes. Use the header row from `frontend/student_roster_template.csv`. Student phone, batch, and room number are optional and can be omitted.
 
 Valid records are committed in one transaction. Invalid rows are skipped and reported by CSV row number. A normal roster re-import updates profiles without changing existing student passwords. A SAP ID already used by a staff account is rejected instead of changing that account's role.
 
-For each new student account, the importer creates a unique 8-character temporary password in the form `stud@` plus three random digits, stores only its hash, and downloads the SAP ID/password pairs as a CSV after the database transaction succeeds. Students must change their password at first login. Because this format has only 1,000 combinations, an import cannot issue more than 1,000 unique temporary passwords. The optional **Reset existing student passwords** checkbox also replaces passwords for matching existing student accounts and signs all users out; use it only when intentionally onboarding or resetting that roster.
+The importer validates each row, reports missing or invalid details, and updates student records without touching account passwords. Students select **Sign Up** on the student login page, provide their SAP ID plus the parent contact and email recorded in the roster, then create and confirm a password of at least 8 characters. Setup verification expires after 10 minutes and repeated failed identity checks lock signup for three hours. Existing accounts created by the earlier importer can use signup once to replace their temporary password; accounts with an already-set password should sign in or use **Forgot password** instead.
 
-Treat the downloaded credential CSV as sensitive: keep it only on an Admin-controlled device, distribute each student's password privately, do not post the file or passwords in a group chat, and securely delete the file after distribution. Do not assign one shared password to the whole roster. This short format is easier to guess than a stronger random password, so use it only for initial sign-in and have students change it immediately. Test first with a few authorized test accounts; for accounts that were imported during previous testing, select **Reset existing student passwords** to generate credentials for them.
+The parent contact and email check is a roster match, not a one-time verification code. Treat the student roster as confidential and only import records that the college has authorized the portal to use. Test first with a few authorized test accounts.
 
 ## Capacity and operations
 

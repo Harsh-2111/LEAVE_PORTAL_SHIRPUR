@@ -13,7 +13,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const logoutModal = document.getElementById('logout-confirm-modal');
   const changePasswordModal = document.getElementById('change-password-modal');
   const forgotPasswordModal = document.getElementById('forgot-password-modal');
-  const state = { csrfToken: '', user: null, wardenApprovedTotal: 0, forgotResetToken: '', forgotCsrfToken: '' };
+  const signupModal = document.getElementById('signup-modal');
+  const state = {
+    csrfToken: '',
+    user: null,
+    wardenApprovedTotal: 0,
+    forgotResetToken: '',
+    forgotCsrfToken: '',
+    signupToken: '',
+    signupCsrfToken: ''
+  };
   let loginProgressTimer = null;
   let wardenAttendanceTimer = null;
   let securityQrScanner = null;
@@ -79,6 +88,106 @@ document.addEventListener('DOMContentLoaded', () => {
     state.forgotResetToken = '';
     state.forgotCsrfToken = '';
     forgotPasswordModal.classList.add('hidden');
+  }
+
+  function openSignupModal() {
+    document.getElementById('signup-identity-form').reset();
+    document.getElementById('signup-password-form').reset();
+    document.getElementById('signup-identity-form').classList.remove('hidden');
+    document.getElementById('signup-password-form').classList.add('hidden');
+    hideMessage(document.getElementById('signup-identity-message'));
+    hideMessage(document.getElementById('signup-password-message'));
+    state.signupToken = '';
+    state.signupCsrfToken = '';
+    signupModal.classList.remove('hidden');
+  }
+
+  function closeSignupModal() {
+    document.getElementById('signup-identity-form').reset();
+    document.getElementById('signup-password-form').reset();
+    document.getElementById('signup-identity-form').classList.remove('hidden');
+    document.getElementById('signup-password-form').classList.add('hidden');
+    hideMessage(document.getElementById('signup-identity-message'));
+    hideMessage(document.getElementById('signup-password-message'));
+    state.signupToken = '';
+    state.signupCsrfToken = '';
+    signupModal.classList.add('hidden');
+  }
+
+  async function handleSignupVerification(event) {
+    event.preventDefault();
+    const button = document.getElementById('verify-signup-button');
+    const message = document.getElementById('signup-identity-message');
+    button.disabled = true;
+    const formData = new FormData();
+    formData.append('action', 'verify');
+    formData.append('sap_id', document.getElementById('signup-sap-id').value.trim());
+    formData.append('parent_contact', document.getElementById('signup-parent-contact').value.trim());
+    formData.append('parent_email', document.getElementById('signup-parent-email').value.trim());
+
+    try {
+      const response = await fetch('/api/index.php?endpoint=signup.php', { method: 'POST', body: formData });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        showMessage(message, result.message || 'Account details could not be verified.', 'text-red-700 bg-red-50');
+        return;
+      }
+
+      state.signupToken = result.signup_token;
+      state.signupCsrfToken = result.csrf_token;
+      document.getElementById('signup-identity-form').classList.add('hidden');
+      document.getElementById('signup-password-form').classList.remove('hidden');
+      hideMessage(message);
+    } catch (error) {
+      console.error(error);
+      showMessage(message, 'Account verification failed. Please try again.', 'text-red-700 bg-red-50');
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function handleSignupCreate(event) {
+    event.preventDefault();
+    const button = document.getElementById('create-student-account-button');
+    const message = document.getElementById('signup-password-message');
+    const password = document.getElementById('signup-password').value;
+    const confirmPassword = document.getElementById('signup-confirm-password').value;
+    if (password.length < 8 || password.length > 72) {
+      showMessage(message, 'Choose a password between 8 and 72 characters.', 'text-red-700 bg-red-50');
+      return;
+    }
+    if (password !== confirmPassword) {
+      showMessage(message, 'Password and confirmation do not match.', 'text-red-700 bg-red-50');
+      return;
+    }
+
+    button.disabled = true;
+    const formData = new FormData();
+    formData.append('action', 'create');
+    formData.append('csrf_token', state.signupCsrfToken);
+    formData.append('signup_token', state.signupToken);
+    formData.append('password', password);
+    formData.append('confirm_password', confirmPassword);
+
+    try {
+      const response = await fetch('/api/index.php?endpoint=signup.php', { method: 'POST', body: formData });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        showMessage(message, result.message || 'Account could not be created.', 'text-red-700 bg-red-50');
+        return;
+      }
+
+      const sapId = document.getElementById('signup-sap-id').value.trim();
+      closeSignupModal();
+      document.getElementById('user-id').value = sapId;
+      document.getElementById('password').value = '';
+      showMessage(loginMessage, result.message || 'Account created. Sign in with your new password.', 'text-green-700 bg-green-50');
+    } catch (error) {
+      console.error(error);
+      showMessage(message, 'Account creation failed. Please try again.', 'text-red-700 bg-red-50');
+    } finally {
+      button.disabled = false;
+    }
   }
 
   function resetForgotPasswordVisibility() {
@@ -261,6 +370,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     roleTitle.textContent = labels[roleSelect.value] || 'Login';
     document.getElementById('student-forgot-password-button')?.classList.toggle('hidden', roleSelect.value !== 'student');
+    document.getElementById('student-signup-button')?.classList.toggle('hidden', roleSelect.value !== 'student');
+    document.getElementById('student-auth-divider')?.classList.toggle('hidden', roleSelect.value !== 'student');
   }
 
   function hideAllPages() {
@@ -389,10 +500,16 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="max-w-5xl mx-auto">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
           <h1 class="text-3xl font-bold text-gray-800">Student Portal</h1>
-          <div class="flex flex-wrap items-center gap-2">
-            <button type="button" id="student-change-password-button" class="bg-amber-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-amber-600">Change Password</button>
-            <button type="button" data-logout-button class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold">Logout</button>
-          </div>
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-2 shadow-sm" aria-label="Student profile">
+                <span class="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-blue-700" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+                </span>
+                <span id="student-profile-display-name" class="max-w-[180px] truncate text-sm font-semibold text-gray-700"></span>
+              </div>
+              <button type="button" id="student-change-password-button" class="bg-amber-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-amber-600">Change Password</button>
+              <button type="button" data-logout-button class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold">Logout</button>
+            </div>
         </div>
         <section class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm mb-6">
           <h2 class="text-2xl font-semibold text-gray-700 mb-4">Submit Leave Request</h2>
@@ -468,6 +585,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const startInput = document.getElementById('student-leave-start');
     const endInput = document.getElementById('student-leave-end');
     const submitButton = document.getElementById('student-submit-leave');
+    const profileDisplayName = document.getElementById('student-profile-display-name');
+    profileDisplayName.textContent = state.user.name || 'Student';
     const now = new Date();
     const localToday = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
     const today = localToday.toISOString().slice(0, 10);
@@ -481,6 +600,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const result = await response.json();
       if (!result.success) throw new Error(result.message || 'Student profile unavailable.');
       const profile = result.student;
+      state.user.name = profile.name || state.user.name;
+      profileDisplayName.textContent = state.user.name || 'Student';
       const fields = {
         'student-profile-name': profile.name,
         'student-profile-contact': profile.student_contact,
@@ -1746,14 +1867,10 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <section class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
           <h2 class="text-2xl font-semibold text-gray-700 mb-4">Import Students CSV</h2>
-          <p class="text-sm text-gray-600 mb-3"><a href="/frontend/student_password_template.csv" class="text-blue-600 underline">Student CSV template</a>. Save as UTF-8 CSV from Excel; XLSX files are not accepted. Maximum 2,500 rows and 2 MB. Student phone, batch, and room number are not required in the roster.</p>
-          <p class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">New students get a unique 8-character temporary password in the form stud@ plus 3 random digits. The app downloads a one-time CSV of SAP IDs and passwords after import. Students must change their password at first login. Share each password privately and delete the downloaded file securely.</p>
+          <p class="text-sm text-gray-600 mb-3"><a href="/frontend/student_roster_template.csv" class="text-blue-600 underline">Student CSV template</a>. Save as UTF-8 CSV from Excel; XLSX files are not accepted. Maximum 2,500 rows and 2 MB. Student phone, batch, and room number are not required in the roster.</p>
+          <p class="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">This imports or updates student records only; it does not create passwords. Students create their own account from the sign-in page using the SAP ID and matching parent contact details in this roster.</p>
           <form id="student-import-form" enctype="multipart/form-data">
             <input type="file" name="students_csv" accept=".csv,text/csv" required class="block w-full text-sm text-gray-500" />
-            <label class="mt-4 flex items-start gap-2 text-sm text-gray-700">
-              <input type="checkbox" name="reset_existing_passwords" value="1" class="mt-1" />
-              <span><strong>Reset existing student passwords:</strong> generate new temporary passwords for existing accounts in this CSV too. This resets every matching student's password and signs all users out.</span>
-            </label>
             <button type="submit" class="mt-4 bg-green-600 text-white px-5 py-3 rounded-lg font-semibold disabled:cursor-wait disabled:opacity-60">Import Students</button>
           </form>
           <div id="admin-import-result" class="mt-4 hidden"></div>
@@ -1769,10 +1886,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const file = fileInput.files[0];
       if (!file || !file.name.toLowerCase().endsWith('.csv') || file.size > 2 * 1024 * 1024) {
         showMessage(resultTarget, 'Choose a CSV file smaller than 2 MB.', 'error');
-        return;
-      }
-      const resetExistingPasswords = form.querySelector('[name="reset_existing_passwords"]').checked;
-      if (resetExistingPasswords && !window.confirm('This will replace the password for every existing student account in this CSV and sign all users out. Continue only if you are ready to distribute the new passwords securely.')) {
         return;
       }
       submitButton.disabled = true;
@@ -1812,24 +1925,6 @@ document.addEventListener('DOMContentLoaded', () => {
           resultTarget.appendChild(errors);
         }
         if (!importSucceeded) return;
-        if (Array.isArray(result.temporary_credentials) && result.temporary_credentials.length > 0) {
-          const csvCell = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
-          const rows = [
-            ['SAP ID', 'Temporary Password'].map(csvCell).join(','),
-            ...result.temporary_credentials.map(account => [account.sap_id, account.temporary_password].map(csvCell).join(','))
-          ];
-          const blob = new Blob([`\uFEFF${rows.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `student-temporary-credentials-${new Date().toISOString().slice(0, 10)}.csv`;
-          link.click();
-          setTimeout(() => URL.revokeObjectURL(url), 1000);
-          const notice = document.createElement('p');
-          notice.className = 'mt-3 font-semibold text-amber-800';
-          notice.textContent = `Downloaded temporary credentials for ${result.temporary_credentials.length} account(s).`;
-          resultTarget.appendChild(notice);
-        }
       } catch (error) {
         console.error(error);
         showMessage(resultTarget, `${error.message || 'Import request failed.'} Do not upload again until you confirm whether these students were added.`, 'text-red-700 bg-red-50');
@@ -1883,6 +1978,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('close-forgot-password-modal')?.addEventListener('click', closeForgotPasswordModal);
   document.getElementById('forgot-password-identity-form')?.addEventListener('submit', handleForgotPasswordIdentity);
   document.getElementById('forgot-password-reset-form')?.addEventListener('submit', handleForgotPasswordReset);
+  document.getElementById('student-signup-button')?.addEventListener('click', openSignupModal);
+  document.getElementById('close-signup-modal')?.addEventListener('click', closeSignupModal);
+  document.getElementById('signup-identity-form')?.addEventListener('submit', handleSignupVerification);
+  document.getElementById('signup-password-form')?.addEventListener('submit', handleSignupCreate);
   document.getElementById('confirm-logout').addEventListener('click', logoutUser);
   document.getElementById('cancel-logout').addEventListener('click', () => logoutModal.classList.add('hidden'));
   updateRoleTitle();

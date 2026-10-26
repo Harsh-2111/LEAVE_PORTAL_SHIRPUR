@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer">
     <title>Smart Hostel Leave App</title>
-    <link rel="stylesheet" href="/frontend/style.css?v=20261026-password-import">
+    <link rel="stylesheet" href="/frontend/style.css?v=20261026-student-signup">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script> 
@@ -85,7 +85,11 @@
                 </div>
             </div>
 
-            <button id="student-forgot-password-button" type="button" class="mt-4 text-sm font-semibold text-blue-700 underline hover:text-blue-900">Forgot password?</button>
+            <div class="mt-4 flex items-center justify-center gap-4">
+                <button id="student-forgot-password-button" type="button" class="text-sm font-semibold text-blue-700 underline hover:text-blue-900">Forgot password?</button>
+                <span id="student-auth-divider" class="text-gray-300" aria-hidden="true">|</span>
+                <button id="student-signup-button" type="button" class="text-sm font-semibold text-blue-700 underline hover:text-blue-900">Sign Up</button>
+            </div>
 
         </form>
         
@@ -379,6 +383,42 @@
         </div>
     </div>
 
-    <script src="/frontend/script.js?v=20261026-password-import"></script>
+    <div id="signup-modal" class="fixed inset-0 hidden bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-xl font-semibold text-gray-800">Create student account</h2>
+                <button type="button" id="close-signup-modal" class="text-gray-500 hover:text-gray-700 text-2xl leading-none" aria-label="Close">×</button>
+            </div>
+            <p class="mb-4 text-sm text-gray-600">Verify your SAP ID using the parent contact details in the student record, then create your password.</p>
+
+            <form id="signup-identity-form" class="space-y-4">
+                <label class="block text-sm font-medium text-gray-700">SAP ID
+                    <input id="signup-sap-id" type="text" inputmode="numeric" autocomplete="username" maxlength="11" minlength="11" required class="mt-1 w-full p-3 border border-gray-300 rounded-lg" placeholder="11-digit SAP ID">
+                </label>
+                <label class="block text-sm font-medium text-gray-700">Parent contact number
+                    <input id="signup-parent-contact" type="tel" inputmode="tel" autocomplete="tel" required class="mt-1 w-full p-3 border border-gray-300 rounded-lg" placeholder="Parent contact on record">
+                </label>
+                <label class="block text-sm font-medium text-gray-700">Parent email
+                    <input id="signup-parent-email" type="email" autocomplete="email" required class="mt-1 w-full p-3 border border-gray-300 rounded-lg" placeholder="Parent email on record">
+                </label>
+                <div id="signup-identity-message" class="hidden rounded-lg p-3 text-sm" aria-live="polite"></div>
+                <button id="verify-signup-button" type="submit" class="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700">Verify details</button>
+            </form>
+
+            <form id="signup-password-form" class="hidden space-y-4">
+                <p class="rounded-lg bg-green-50 p-3 text-sm text-green-800">Details matched. Create a password of at least 8 characters.</p>
+                <label class="block text-sm font-medium text-gray-700">Create password
+                    <input id="signup-password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required class="mt-1 w-full p-3 border border-gray-300 rounded-lg" placeholder="8 to 72 characters">
+                </label>
+                <label class="block text-sm font-medium text-gray-700">Confirm password
+                    <input id="signup-confirm-password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required class="mt-1 w-full p-3 border border-gray-300 rounded-lg" placeholder="Re-enter password">
+                </label>
+                <div id="signup-password-message" class="hidden rounded-lg p-3 text-sm" aria-live="polite"></div>
+                <button id="create-student-account-button" type="submit" class="w-full rounded-lg bg-green-700 px-4 py-3 font-semibold text-white hover:bg-green-800">Create account</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/frontend/script.js?v=20261026-student-signup"></script>
 </body>
 </html>
