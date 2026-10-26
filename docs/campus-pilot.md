@@ -10,29 +10,17 @@
 
 ## Database update
 
-For an existing PostgreSQL/Supabase installation, apply `database/migration_student_activation_postgres.sql` in the Supabase SQL editor before using the activation-email importer. It adds the student email field and one-time token table. If you created a new database from the updated `supabase_schema.sql`, you do not need this migration.
-
-For an existing MySQL installation, use `database/migration_student_activation_mysql.sql` once instead. New installations from the updated MySQL schema already include these objects.
+The student importer uses temporary passwords and does not need a new database migration. If you already ran the previous activation migration, leave its unused student email column and token table in place; do not rerun or manually drop them.
 
 ## Roster import
 
-The Admin importer accepts UTF-8 CSV only (not `.xlsx`), up to 2,500 data rows and 2 MB per upload. In Excel, use **Save As → CSV UTF-8**. Check that SAP IDs and phone numbers remain intact; format these columns as text if Excel removes leading zeroes. Use the header row from `frontend/student_activation_template.csv`. Every student needs a valid official `@nmims.in` address in the `student_email` column.
+The Admin importer accepts UTF-8 CSV only (not `.xlsx`), up to 2,500 data rows and 2 MB per upload. In Excel, use **Save As → CSV UTF-8**. Check that SAP IDs and phone numbers remain intact; format these columns as text if Excel removes leading zeroes. Use the header row from `frontend/student_password_template.csv`.
 
-Valid records are committed in one transaction. Invalid rows are skipped and reported by CSV row number. A roster re-import updates profiles and reactivates matching student accounts without resetting passwords or sending another email. A SAP ID already used by a staff account is rejected instead of changing that account's role.
+Valid records are committed in one transaction. Invalid rows are skipped and reported by CSV row number. A normal roster re-import updates profiles without changing existing student passwords. A SAP ID already used by a staff account is rejected instead of changing that account's role.
 
-For each genuinely new account, the importer creates a random unusable initial password, stores only its hash, and emails a single-use activation link to the student's official email. The student chooses their password on the activation page; the app never sends passwords by email. Links expire after 24 hours. If delivery fails, re-import the same CSV with **Resend activation links** selected; that sends new links only to accounts still awaiting activation and invalidates their previous links. Activated students are not reset.
+For each new student account, the importer creates a unique 8-character temporary password in the form `stud@` plus three random digits, stores only its hash, and downloads the SAP ID/password pairs as a CSV after the database transaction succeeds. Students must change their password at first login. Because this format has only 1,000 combinations, an import cannot issue more than 1,000 unique temporary passwords. The optional **Reset existing student passwords** checkbox also replaces passwords for matching existing student accounts and signs all users out; use it only when intentionally onboarding or resetting that roster.
 
-### Configure activation email on Vercel
-
-This implementation sends through Resend. Create a Resend account, add and verify an email-sending domain that the campus authorizes, and create an API key. Do not assume that owning an `@nmims.in` mailbox grants permission to send as that domain; campus IT/domain administrators must approve and configure it. In Vercel → Project → Settings → Environment Variables, configure these for Production, then redeploy:
-
-| Variable | Value |
-| --- | --- |
-| `RESEND_API_KEY` | Private Resend API key; never put it in frontend files or Git |
-| `ACTIVATION_FROM_EMAIL` | Sender name/address using the verified, campus-approved domain |
-| `APP_BASE_URL` | Public site origin, for example `https://leaveportal-rose.vercel.app` (no trailing slash) |
-
-Test the flow with a few authorized test accounts first. Confirm the import reports emails sent, verify the message arrives, open the link, set a password, then check that reusing the same link fails. The student's inbox must be reachable to activate the account.
+Treat the downloaded credential CSV as sensitive: keep it only on an Admin-controlled device, distribute each student's password privately, do not post the file or passwords in a group chat, and securely delete the file after distribution. Do not assign one shared password to the whole roster. This short format is easier to guess than a stronger random password, so use it only for initial sign-in and have students change it immediately. Test first with a few authorized test accounts; for accounts that were imported during previous testing, select **Reset existing student passwords** to generate credentials for them.
 
 ## Capacity and operations
 

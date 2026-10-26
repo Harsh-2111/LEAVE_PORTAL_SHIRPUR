@@ -95,7 +95,7 @@ Students sign in with their SAP ID, submit a leave request, and see its status i
 
 If a parent cannot be reached or the person answering is not the parent, the warden must enter a reason. The leave remains `Pending Verification` for the student but moves out of the Warden's main pending list into **Show Not Reached/Wrong person Leave**. From that follow-up table, a warden can approve or reject the request; a reason is required for either resolution. Approval grants the request and creates its gate pass; rejection changes its status to `Rejected`. Each call attempt and its remarks are retained in the call log.
 
-The Admin importer uses the activation CSV template at `frontend/student_activation_template.csv`. Each new student must have an official `@nmims.in` address. New accounts receive a one-time activation email so students can choose their own password; the app does not email passwords. See `docs/campus-pilot.md` for the email-provider setup and safe import procedure.
+The Admin importer uses `frontend/student_password_template.csv`. Each new student receives a unique 8-character temporary password in the form `stud@` plus three random digits in a one-time CSV download, and must change it at first login. This format supports at most 1,000 unique temporary passwords per import. See `docs/campus-pilot.md` for safe password distribution.
 
 ### Existing database volume
 
@@ -115,7 +115,7 @@ Get-Content -Raw .\database\migration_gate_attendance_mysql.sql | docker compose
 
 For an existing Supabase database, run `database/migration_gate_attendance_postgres.sql` in the Supabase SQL Editor. New installations receive the gate columns and status values from the corresponding schema file.
 
-For the student activation feature, run `database/migration_student_activation_postgres.sql` in the Supabase SQL Editor, or `database/migration_student_activation_mysql.sql` for MySQL. Configure `RESEND_API_KEY`, `ACTIVATION_FROM_EMAIL`, and `APP_BASE_URL` in the hosting environment before sending invitations. The sender address must use an authorized, verified domain. See `docs/campus-pilot.md` for details.
+The temporary-password importer does not require any Supabase SQL migration or email-provider settings. If you previously ran the student-activation migration, leave its unused email column and token table in place; no rollback is needed.
 
 ## Production checklist
 

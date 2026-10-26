@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $user = requireRole(['admin']);
 requireCsrfToken();
-$resendPendingInvitations = ($_POST['resend_pending_invitations'] ?? '') === '1';
+$resetExistingPasswords = ($_POST['reset_existing_passwords'] ?? '') === '1';
 
 $upload = $_FILES['students_csv'] ?? null;
 if (!is_array($upload) || $upload['error'] !== UPLOAD_ERR_OK) {
@@ -47,7 +47,6 @@ $columnMap = [
     'sap_id' => ['sap_id', 'sapid', 'student_id', 'sap id'],
     'name' => ['name', 'student_name', 'full_name', 'student name'],
     'student_contact' => ['student_contact', 'student_phone', 'student mobile', 'student phone'],
-    'student_email' => ['student_email', 'official_email', 'student_email_address'],
     'gender' => ['gender', 'student_gender'],
     'course' => ['course', 'program_type', 'degree'],
     'year' => ['year', 'academic_year', 'student_year'],
@@ -96,7 +95,7 @@ foreach ($columnMap as $field => $aliases) {
 }
 
 $missingColumns = [];
-foreach (['sap_id', 'name', 'student_contact', 'student_email', 'gender', 'course', 'year', 'branch', 'batch', 'parent_email', 'parent_contact'] as $requiredField) {
+foreach (['sap_id', 'name', 'student_contact', 'gender', 'course', 'year', 'branch', 'batch', 'parent_email', 'parent_contact'] as $requiredField) {
     if (!isset($resolvedColumns[$requiredField])) {
         $missingColumns[] = $requiredField;
     }
@@ -113,7 +112,6 @@ if ($missingColumns !== []) {
 
 $records = [];
 $seenSapIds = [];
-$seenStudentEmails = [];
 $recordRows = [];
 $errors = [];
 $errorCount = 0;
@@ -166,7 +164,6 @@ while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
     $branch = $record['branch'] ?? '';
     $batch = $record['batch'] ?? '';
     $studentContact = $record['student_contact'] ?? '';
-    $studentEmail = strtolower($record['student_email'] ?? '');
     $gender = strtolower($record['gender'] ?? '');
     $courseInput = (string)preg_replace('/[^a-z]/', '', strtolower($record['course'] ?? ''));
     $course = $courseMap[$courseInput] ?? '';
@@ -181,8 +178,7 @@ while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
         || strlen($hostelBlock) > 50
         || strlen($roomNo) > 50
         || strlen($parentName) > 150
-        || strlen($parentEmail) > 255
-        || strlen($studentEmail) > 255;
+        || strlen($parentEmail) > 255;
 
     if (
         $studentName === '' || $hasOversizedField || $year === ''
@@ -200,23 +196,12 @@ while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
         $addError($lineNumber, $sapId, 'Student phone, parent email, or parent contact is invalid.');
         continue;
     }
-    if (!filter_var($studentEmail, FILTER_VALIDATE_EMAIL) || !str_ends_with($studentEmail, '@nmims.in')) {
-        $addError($lineNumber, $sapId, 'Student email must be a valid @nmims.in address.');
-        continue;
-    }
-    if (isset($seenStudentEmails[$studentEmail])) {
-        $addError($lineNumber, $sapId, 'This student email appears more than once in the CSV.');
-        continue;
-    }
-
     $seenSapIds[$sapId] = true;
-    $seenStudentEmails[$studentEmail] = true;
     $recordRows[$sapId] = $lineNumber;
     $records[$sapId] = [
         'sap_id' => $sapId,
         'name' => $studentName,
         'student_contact' => $studentContact,
-        'student_email' => $studentEmail,
         'gender' => $gender,
         'course' => $course,
         'year' => $year,
@@ -243,54 +228,19 @@ if ($records === []) {
     exit;
 }
 
-$emails = array_values(array_unique(array_column($records, 'student_email')));
-$emailOwners = [];
-foreach (array_chunk($emails, 300) as $emailChunk) {
-    if ($emailChunk === []) {
-        continue;
-    }
-    $placeholders = implode(', ', array_fill(0, count($emailChunk), '?'));
-    $emailStmt = $pdo->prepare("SELECT sap_id, LOWER(student_email) AS student_email FROM students WHERE LOWER(student_email) IN ($placeholders)");
-    $emailStmt->execute($emailChunk);
-    foreach ($emailStmt->fetchAll() as $owner) {
-        $emailOwners[$owner['student_email']] = $owner['sap_id'];
-    }
-}
-foreach ($records as $sapId => $record) {
-    $owner = $emailOwners[$record['student_email']] ?? null;
-    if ($owner !== null && trim((string)$owner) !== $sapId) {
-        $addError($recordRows[$sapId], $sapId, 'This official email is already assigned to a different student SAP ID.');
-        unset($records[$sapId]);
-    }
-}
-if ($records === []) {
-    http_response_code(422);
-    echo json_encode([
-        'success' => false,
-        'imported' => 0,
-        'errors' => $errors,
-        'error_count' => $errorCount,
-        'message' => 'No records were imported because the official email addresses are already assigned to other students.',
-    ]);
-    exit;
-}
-
 $accounts = [];
 $idChunks = array_chunk(array_keys($records), 300);
 foreach ($idChunks as $ids) {
     $placeholders = implode(', ', array_fill(0, count($ids), '?'));
-    $accountStmt = $pdo->prepare("SELECT login_id, role, must_change_password FROM users WHERE login_id IN ($placeholders)");
+    $accountStmt = $pdo->prepare("SELECT login_id, role FROM users WHERE login_id IN ($placeholders)");
     $accountStmt->execute($ids);
     foreach ($accountStmt->fetchAll() as $account) {
-        $accounts[$account['login_id']] = [
-            'role' => $account['role'],
-            'must_change_password' => $account['must_change_password'],
-        ];
+        $accounts[$account['login_id']] = $account['role'];
     }
 }
 
 foreach ($records as $sapId => $record) {
-    if (isset($accounts[$sapId]) && $accounts[$sapId]['role'] !== 'student') {
+    if (isset($accounts[$sapId]) && $accounts[$sapId] !== 'student') {
         $addError($recordRows[$sapId], $sapId, 'This login ID belongs to a non-student account; its role was not changed.');
         unset($records[$sapId]);
     }
@@ -307,27 +257,34 @@ if ($records === []) {
     exit;
 }
 
-$newAccountIds = [];
-$pendingResendIds = [];
+$credentialAccounts = [];
+$usedTemporaryPasswords = [];
 foreach ($records as $sapId => $record) {
-    if (!isset($accounts[$sapId])) {
-        $newAccountIds[] = $sapId;
-    } elseif (
-        $resendPendingInvitations
-        && databaseBool($accounts[$sapId]['must_change_password'])
-    ) {
-        $pendingResendIds[] = $sapId;
+    if (!isset($accounts[$sapId]) || $resetExistingPasswords) {
+        if (count($usedTemporaryPasswords) >= 1000) {
+            http_response_code(422);
+            echo json_encode([
+                'success' => false,
+                'imported' => 0,
+                'message' => 'This import needs more than 1,000 temporary passwords. Split it into smaller imports or use a stronger password format.',
+            ]);
+            exit;
+        }
+        do {
+            $temporaryPassword = 'stud@' . str_pad((string)random_int(0, 999), 3, '0', STR_PAD_LEFT);
+        } while (isset($usedTemporaryPasswords[$temporaryPassword]));
+        $usedTemporaryPasswords[$temporaryPassword] = true;
+        $credentialAccounts[$sapId] = [
+            'sap_id' => $sapId,
+            'temporary_password' => $temporaryPassword,
+            'password_hash' => password_hash($temporaryPassword, PASSWORD_BCRYPT, ['cost' => 5]),
+        ];
     }
-}
-$invitationCandidateIds = array_values(array_unique(array_merge($newAccountIds, $pendingResendIds)));
-$newAccountHashes = [];
-foreach ($newAccountIds as $sapId) {
-    $newAccountHashes[$sapId] = password_hash(bin2hex(random_bytes(32)), PASSWORD_BCRYPT, ['cost' => 5]);
 }
 
 $chunkSize = 100;
 $studentColumns = [
-    'sap_id', 'name', 'student_contact', 'student_email', 'gender', 'course', 'year', 'branch', 'batch',
+    'sap_id', 'name', 'student_contact', 'gender', 'course', 'year', 'branch', 'batch',
     'hostel_block', 'room_no', 'parent_name', 'parent_email', 'parent_contact',
 ];
 $studentPlaceholders = '(' . implode(', ', array_fill(0, count($studentColumns), '?'))
@@ -360,6 +317,11 @@ try {
         array_keys($records),
         static fn(string $sapId): bool => isset($accounts[$sapId])
     ));
+    $credentialAccountIds = array_keys($credentialAccounts);
+    $newAccountIds = array_values(array_filter(
+        $credentialAccountIds,
+        static fn(string $sapId): bool => !isset($accounts[$sapId])
+    ));
     foreach (array_chunk($existingStudentIds, 100) as $ids) {
         if ($ids === []) {
             continue;
@@ -372,6 +334,17 @@ try {
             $params[] = $records[$sapId]['name'];
         }
         $assignments = 'name = CASE login_id ' . implode(' ', $caseParts) . ' ELSE name END';
+        if ($resetExistingPasswords) {
+            $passwordCases = [];
+            foreach ($ids as $sapId) {
+                $passwordCases[] = 'WHEN ? THEN ?';
+                $params[] = $sapId;
+                $params[] = $credentialAccounts[$sapId]['password_hash'];
+            }
+            $assignments .= ', password_hash = CASE login_id ' . implode(' ', $passwordCases)
+                . ' ELSE password_hash END, must_change_password = '
+                . (DB_DRIVER === 'pgsql' ? 'TRUE' : '1');
+        }
         $placeholders = implode(', ', array_fill(0, count($ids), '?'));
         $params = array_merge($params, $ids);
         $updateUsers = $pdo->prepare(
@@ -389,7 +362,7 @@ try {
         foreach ($ids as $sapId) {
             $userValues[] = '(?, ?, ?, ?, ' . (DB_DRIVER === 'pgsql' ? 'TRUE' : '1') . ', ' . (DB_DRIVER === 'pgsql' ? 'TRUE' : '1') . ')';
             $params[] = $sapId;
-            $params[] = $newAccountHashes[$sapId];
+            $params[] = $credentialAccounts[$sapId]['password_hash'];
             $params[] = 'student';
             $params[] = $records[$sapId]['name'];
         }
@@ -400,52 +373,29 @@ try {
         $userStmt->execute($params);
     }
 
-    $invitationRows = [];
-    $inviteUsers = [];
-    foreach (array_chunk($invitationCandidateIds, 300) as $ids) {
+    foreach (array_chunk($credentialAccountIds, 300) as $ids) {
         if ($ids === []) {
             continue;
         }
         $placeholders = implode(', ', array_fill(0, count($ids), '?'));
-        $accountStmt = $pdo->prepare(
-            "SELECT id, login_id FROM users WHERE role = 'student' AND is_active = "
-            . (DB_DRIVER === 'pgsql' ? 'TRUE' : '1')
-            . " AND must_change_password = " . (DB_DRIVER === 'pgsql' ? 'TRUE' : '1')
-            . " AND login_id IN ($placeholders)"
-        );
-        $accountStmt->execute($ids);
-        foreach ($accountStmt->fetchAll() as $account) {
-            $sapId = $account['login_id'];
-            $token = bin2hex(random_bytes(32));
-            $inviteUsers[] = [
-                'user_id' => (int)$account['id'],
-                'sap_id' => $sapId,
-                'token' => $token,
-            ];
-            $invitationRows[] = [
-                'user_id' => (int)$account['id'],
-                'token_hash' => hash('sha256', $token),
-                'expires_at' => gmdate('Y-m-d H:i:s', time() + 86400),
-            ];
+        $verifyStmt = $pdo->prepare("SELECT login_id, password_hash FROM users WHERE login_id IN ($placeholders)");
+        $verifyStmt->execute($ids);
+        $storedHashes = [];
+        foreach ($verifyStmt->fetchAll() as $row) {
+            $storedHashes[$row['login_id']] = $row['password_hash'];
+        }
+        foreach ($ids as $sapId) {
+            if (
+                !isset($storedHashes[$sapId])
+                || !password_verify($credentialAccounts[$sapId]['temporary_password'], $storedHashes[$sapId])
+            ) {
+                throw new RuntimeException('A temporary credential changed during import. No records were saved; retry the import.');
+            }
         }
     }
 
-    foreach (array_chunk($invitationRows, 100) as $chunk) {
-        $values = [];
-        $params = [];
-        foreach ($chunk as $invitation) {
-            $values[] = '(?, ?, ?, NULL)';
-            $params[] = $invitation['user_id'];
-            $params[] = $invitation['token_hash'];
-            $params[] = $invitation['expires_at'];
-        }
-        $tokenSql = 'INSERT INTO student_activation_tokens (user_id, token_hash, expires_at, activated_at) VALUES '
-            . implode(', ', $values)
-            . (DB_DRIVER === 'pgsql'
-                ? ' ON CONFLICT (user_id) DO UPDATE SET token_hash = EXCLUDED.token_hash, expires_at = EXCLUDED.expires_at, activated_at = NULL'
-                : ' ON DUPLICATE KEY UPDATE token_hash = VALUES(token_hash), expires_at = VALUES(expires_at), activated_at = NULL');
-        $tokenStmt = $pdo->prepare($tokenSql);
-        $tokenStmt->execute($params);
+    if ($resetExistingPasswords) {
+        $pdo->exec('DELETE FROM app_sessions');
     }
 
     writeAudit(
@@ -457,7 +407,7 @@ try {
         [
             'imported' => count($records),
             'new_accounts' => count($newAccountIds),
-            'activation_invitations' => count($invitationRows),
+            'existing_password_resets' => count($credentialAccountIds) - count($newAccountIds),
             'row_errors' => $errorCount,
         ],
         $_SERVER['REMOTE_ADDR'] ?? null
@@ -473,38 +423,22 @@ try {
     exit;
 }
 
-$emailInvitations = [];
-foreach ($inviteUsers as $invite) {
-    $record = $records[$invite['sap_id']];
-    $emailInvitations[] = [
-        'name' => $record['name'],
-        'email' => $record['student_email'],
-        'token' => $invite['token'],
-    ];
-}
-
-require_once __DIR__ . '/student_activation_mail.php';
-$delivery = deliverStudentActivationEmails($emailInvitations);
-
-$message = count($records) . ' student record(s) imported or updated. '
-    . $delivery['sent'] . ' activation email(s) sent.';
-if ($delivery['failed'] > 0) {
-    $message .= ' ' . $delivery['failed'] . ' activation email(s) could not be sent. Configure the email settings, then re-import this CSV with "Resend activation links for students still awaiting activation" selected.';
-}
-if ($resendPendingInvitations && $emailInvitations === []) {
-    $message .= ' No matching accounts were awaiting activation.';
-}
-if ($errorCount > 0) {
-    $message .= ' Some CSV rows were skipped; review the row errors.';
-}
+$credentialRows = array_map(
+    static fn(array $account): array => [
+        'sap_id' => $account['sap_id'],
+        'temporary_password' => $account['temporary_password'],
+    ],
+    array_values($credentialAccounts)
+);
 
 echo json_encode([
     'success' => true,
     'imported' => count($records),
-    'new_accounts_count' => count($newAccountIds),
-    'activation_email_sent_count' => $delivery['sent'],
-    'activation_email_failed_count' => $delivery['failed'],
+    'credential_accounts_count' => count($credentialAccounts),
+    'temporary_credentials' => $credentialRows,
     'errors' => $errors,
     'error_count' => $errorCount,
-    'message' => $message,
+    'message' => count($records) . ' student record(s) imported or updated.'
+        . ($resetExistingPasswords ? ' Temporary passwords were issued for all imported student accounts.' : ' Existing student passwords were not changed.')
+        . ($errorCount > 0 ? ' Some CSV rows were skipped; review the row errors.' : ''),
 ]);

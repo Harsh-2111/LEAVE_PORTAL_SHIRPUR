@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer">
     <title>Smart Hostel Leave App</title>
-    <link rel="stylesheet" href="/frontend/style.css?v=20261026-activation">
+    <link rel="stylesheet" href="/frontend/style.css?v=20261026-password-import">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script> 
@@ -13,21 +13,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body class="font-inter bg-gray-100 min-h-screen flex items-center justify-center p-4">
-    <main id="student-activation-page" class="hidden w-full max-w-md rounded-xl bg-white p-8 shadow-lg">
-        <img src="/logo.png" alt="SVKM's NMIMS Deemed to be University" class="mx-auto mb-5 h-20 w-auto max-w-full object-contain">
-        <h1 class="mb-3 text-center text-2xl font-bold text-gray-800">Activate your student account</h1>
-        <p class="mb-5 text-sm text-gray-600">Choose a password of at least 8 characters. The activation link works once and expires after 24 hours.</p>
-        <form id="student-activation-form" class="space-y-4">
-            <label class="block text-sm font-medium text-gray-700">New password
-                <input id="activation-password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required class="mt-1 w-full rounded-lg border border-gray-300 p-3" placeholder="At least 8 characters">
-            </label>
-            <label class="block text-sm font-medium text-gray-700">Confirm new password
-                <input id="activation-password-confirm" type="password" autocomplete="new-password" minlength="8" maxlength="72" required class="mt-1 w-full rounded-lg border border-gray-300 p-3" placeholder="Re-enter your password">
-            </label>
-            <div id="student-activation-message" class="hidden rounded-lg p-3 text-sm" aria-live="polite"></div>
-            <button id="student-activation-submit" type="submit" class="w-full rounded-lg bg-blue-600 p-3 font-semibold text-white hover:bg-blue-700">Set password and activate</button>
-        </form>
-    </main>
     <div id="app-container" class="login-shell bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
         <div id="landing-page" class="landing-layout">
             <section id="landing-info" aria-labelledby="landing-title">
@@ -394,6 +379,6 @@
         </div>
     </div>
 
-    <script src="/frontend/script.js?v=20261026-activation"></script>
+    <script src="/frontend/script.js?v=20261026-password-import"></script>
 </body>
 </html>

@@ -8,6 +8,7 @@ __pycache__/
 uploads/
 *.csv
 !frontend/student_template.csv
+!frontend/student_password_template.csv
 
 # Logs
 logs/

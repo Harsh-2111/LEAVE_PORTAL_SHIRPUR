@@ -7,7 +7,6 @@ $endpoints = [
     'session.php' => 'session.php',
     'forgot_password.php' => 'forgot_password.php',
     'change_password.php' => 'change_password.php',
-    'activate_student.php' => 'activate_student.php',
     'student_lookup.php' => 'student_lookup.php',
     'my_leaves.php' => 'my_leaves.php',
     'submit_student_leave.php' => 'submit_student_leave.php',
