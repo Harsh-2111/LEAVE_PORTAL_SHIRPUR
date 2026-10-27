@@ -15,6 +15,8 @@ Run `database/migration_leave_request_contact_address_times_postgres.sql` in Sup
 
 For four-hostel warden separation, run `database/migration_warden_hostel_scope_postgres.sql` in Supabase SQL Editor (or `database/migration_warden_hostel_scope_mysql.sql` for MySQL). It assigns `warden1` to New Boys Hostel, `warden2` to Boys Hostel 1, `warden3` to New Girls Hostel, and `warden4` to Old Girls Hostel. The new accounts require a password change at first login; their temporary passwords are provided separately to the administrator. Existing wardens must sign out and back in after migration for the hostel assignment to load.
 
+If Warden 1 or 2 is still labeled as a girls' warden, run `database/migration_warden_gender_labels_postgres.sql` in Supabase SQL Editor (or `database/migration_warden_gender_labels_mysql.sql` for MySQL), then have all four wardens sign out and back in. Wardens 1 and 2 are boys' wardens; Wardens 3 and 4 are girls' wardens.
+
 For an existing database, also apply the gate-attendance indexes to speed up date-specific reports and attendance filters. These index migrations assume the gate timestamp columns already exist; if not, run the existing gate attendance migration first. In Supabase, run `database/migration_gate_attendance_indexes_postgres.sql` in SQL Editor. For MySQL, run this from the project directory:
 
 ```powershell

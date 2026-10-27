@@ -42,12 +42,14 @@ $$;
 
 UPDATE public.users
 SET warden_gender = 'male',
-    warden_hostel = 'NEW BOYS HOSTEL'
+    warden_hostel = 'NEW BOYS HOSTEL',
+    name = 'Boys Hostel Warden'
 WHERE login_id = 'warden1' AND role = 'warden';
 
 UPDATE public.users
 SET warden_gender = 'male',
-    warden_hostel = 'BOYS HOSTEL 1'
+    warden_hostel = 'BOYS HOSTEL 1',
+    name = 'Boys Hostel Warden'
 WHERE login_id = 'warden2' AND role = 'warden';
 
 UPDATE public.leave_requests
