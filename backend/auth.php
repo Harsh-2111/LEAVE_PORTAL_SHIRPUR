@@ -115,7 +115,31 @@ function requireAuth(): array
         exit;
     }
 
-    return $_SESSION['user'];
+    $user = $_SESSION['user'];
+    if (($user['role'] ?? '') === 'student') {
+        $pdo = $GLOBALS['pdo'] ?? null;
+        if (!$pdo instanceof PDO) {
+            throw new RuntimeException('Database connection is not available for student account validation.');
+        }
+
+        $accountStmt = $pdo->prepare(
+            'SELECT is_active, must_change_password FROM users WHERE id = ? AND role = ? LIMIT 1'
+        );
+        $accountStmt->execute([(int)$user['id'], 'student']);
+        $account = $accountStmt->fetch();
+        if (!$account || !databaseBool($account['is_active']) || databaseBool($account['must_change_password'])) {
+            unset($_SESSION['user']);
+            session_regenerate_id(true);
+            http_response_code(401);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Your student account needs to be set up again. Sign up using your student details.',
+            ]);
+            exit;
+        }
+    }
+
+    return $user;
 }
 
 function requireRole(array $roles): array

@@ -2002,6 +2002,10 @@ document.addEventListener('DOMContentLoaded', () => {
           <p class="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">This imports or updates student records only; it does not create passwords. Students create their own account using their SAP ID, either parent contact number, and matching official email ID from this roster.</p>
           <form id="student-import-form" enctype="multipart/form-data">
             <input type="file" name="students_csv" accept=".csv,text/csv" required class="block w-full text-sm text-gray-500" />
+            <label class="mt-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <input id="reset-student-accounts" type="checkbox" name="reset_student_accounts" value="1" class="mt-1 h-4 w-4 accent-amber-600" />
+              <span><strong>Require students in this CSV to sign up again.</strong> Their existing passwords will stop working and they must verify their SAP ID, either parent contact, and official email before creating a new password. Student profiles and leave history are preserved. This applies only to valid student rows in this upload.</span>
+            </label>
             <button type="submit" class="mt-4 bg-green-600 text-white px-5 py-3 rounded-lg font-semibold disabled:cursor-wait disabled:opacity-60">Import Students</button>
           </form>
           <div id="admin-import-result" class="mt-4 hidden"></div>
@@ -2017,6 +2021,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const file = fileInput.files[0];
       if (!file || !file.name.toLowerCase().endsWith('.csv') || file.size > 2 * 1024 * 1024) {
         showMessage(resultTarget, 'Choose a CSV file smaller than 2 MB.', 'error');
+        return;
+      }
+      if (document.getElementById('reset-student-accounts').checked
+        && !window.confirm('Reset accounts for valid students in this CSV? Their existing passwords will stop working and each student will need to sign up again. Student profiles and leave history will be preserved.')) {
         return;
       }
       submitButton.disabled = true;
@@ -2038,7 +2046,9 @@ document.addEventListener('DOMContentLoaded', () => {
         showMessage(
           resultTarget,
           `${result.message || (importSucceeded ? 'Import complete.' : 'The server could not complete the import.')}${statusNote}`,
-          importSucceeded ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'
+          importSucceeded
+            ? result.error_count > 0 ? 'text-amber-800 bg-amber-50' : 'text-green-700 bg-green-50'
+            : 'text-red-700 bg-red-50'
         );
         if (result.errors?.length) {
           const errors = document.createElement('ul');

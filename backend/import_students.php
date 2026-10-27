@@ -119,6 +119,9 @@ $recordRows = [];
 $errors = [];
 $errorCount = 0;
 $lineNumber = 1;
+$dataRowCount = 0;
+$rowLimitExceeded = false;
+$resetStudentAccounts = ($_POST['reset_student_accounts'] ?? '') === '1';
 $addError = static function (int $rowNumber, string $sapId, string $message) use (&$errors, &$errorCount): void {
     $errorCount++;
     if (count($errors) < 100) {
@@ -138,9 +141,13 @@ while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
     if (count($row) === 1 && trim((string)$row[0]) === '') {
         continue;
     }
-    if ($lineNumber > 2501) {
-        $addError($lineNumber, '', 'Import is limited to 2,500 data rows per CSV.');
-        break;
+    $dataRowCount++;
+    if ($dataRowCount > 2500) {
+        if (!$rowLimitExceeded) {
+            $addError($lineNumber, '', 'Import is limited to 2,500 data rows per CSV; rows after the limit were not imported.');
+            $rowLimitExceeded = true;
+        }
+        continue;
     }
 
     $record = [];
@@ -226,9 +233,12 @@ if ($records === []) {
     echo json_encode([
         'success' => false,
         'imported' => 0,
+        'total_rows' => $dataRowCount,
+        'skipped' => $dataRowCount,
         'errors' => $errors,
         'error_count' => $errorCount,
-        'message' => 'No valid student rows were found.',
+        'message' => 'No valid student rows were found: 0 of ' . $dataRowCount . ' non-empty CSV data row(s) imported; '
+            . $dataRowCount . ' row(s) skipped.',
     ]);
     exit;
 }
@@ -255,9 +265,12 @@ if ($records === []) {
     echo json_encode([
         'success' => false,
         'imported' => 0,
+        'total_rows' => $dataRowCount,
+        'skipped' => $dataRowCount,
         'errors' => $errors,
         'error_count' => $errorCount,
-        'message' => 'No records were imported because each valid SAP ID conflicts with a staff account.',
+        'message' => 'No records were imported because each valid SAP ID conflicts with a staff account: 0 of '
+            . $dataRowCount . ' non-empty CSV data row(s) imported; ' . $dataRowCount . ' row(s) skipped.',
     ]);
     exit;
 }
@@ -300,6 +313,29 @@ try {
         $studentStmt->execute($params);
     }
 
+    $resetAccountCount = 0;
+    if ($resetStudentAccounts) {
+        $registeredStudentIds = array_values(array_filter(
+            array_keys($records),
+            static fn(int|string $sapId): bool => ($accounts[$sapId] ?? null) === 'student'
+        ));
+        if ($registeredStudentIds !== []) {
+            $unusablePasswordHash = password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT);
+            foreach (array_chunk($registeredStudentIds, 300) as $ids) {
+                $placeholders = implode(', ', array_fill(0, count($ids), '?'));
+                $resetStmt = $pdo->prepare(
+                    'UPDATE users SET password_hash = ?, must_change_password = '
+                    . (DB_DRIVER === 'pgsql' ? 'TRUE' : '1')
+                    . ', updated_at = NOW() WHERE role = ? AND is_active = '
+                    . (DB_DRIVER === 'pgsql' ? 'TRUE' : '1')
+                    . " AND login_id IN ($placeholders)"
+                );
+                $resetStmt->execute(array_merge([$unusablePasswordHash, 'student'], $ids));
+                $resetAccountCount += $resetStmt->rowCount();
+            }
+        }
+    }
+
     writeAudit(
         $pdo,
         (int)$user['id'],
@@ -308,7 +344,10 @@ try {
         null,
         [
             'imported' => count($records),
+            'total_rows' => $dataRowCount,
+            'skipped_rows' => $dataRowCount - count($records),
             'row_errors' => $errorCount,
+            'student_accounts_reset' => $resetAccountCount,
         ],
         $_SERVER['REMOTE_ADDR'] ?? null
     );
@@ -326,8 +365,15 @@ try {
 echo json_encode([
     'success' => true,
     'imported' => count($records),
+    'total_rows' => $dataRowCount,
+    'skipped' => $dataRowCount - count($records),
+    'student_accounts_reset' => $resetAccountCount,
     'errors' => $errors,
     'error_count' => $errorCount,
-    'message' => count($records) . ' student record(s) imported or updated. Students can create their own account from the sign-in page.'
-        . ($errorCount > 0 ? ' Some CSV rows were skipped; review the row errors.' : ''),
+    'message' => count($records) . ' of ' . $dataRowCount . ' non-empty CSV data row(s) imported or updated; '
+        . ($dataRowCount - count($records)) . ' row(s) skipped.'
+        . ($resetStudentAccounts
+            ? ' ' . $resetAccountCount . ' existing student account(s) must sign up again; student records and leave history were preserved.'
+            : ' Students can create their own account from the sign-in page.')
+        . ($errorCount > 0 ? ' Review the row errors below.' : ''),
 ]);
