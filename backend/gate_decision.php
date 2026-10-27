@@ -24,7 +24,7 @@ if ($leaveId <= 0 || $passToken === '' || !in_array($decision, ['accept', 'rejec
 
 try {
     $pdo->beginTransaction();
-    $stmt = $pdo->prepare('SELECT sap_id, qr_code_data, status, end_date, gate_out_time, gate_in_time FROM leave_requests WHERE id = ? AND pass_token = ? AND status IN (\'Granted\', \'CHECKED_OUT\', \'CHECKED_IN\') LIMIT 1 FOR UPDATE');
+    $stmt = $pdo->prepare('SELECT sap_id, qr_code_data, status, end_date, end_time, gate_out_time, gate_in_time FROM leave_requests WHERE id = ? AND pass_token = ? AND status IN (\'Granted\', \'CHECKED_OUT\', \'CHECKED_IN\') LIMIT 1 FOR UPDATE');
     $stmt->execute([$leaveId, $passToken]);
     $pass = $stmt->fetch();
 
@@ -101,15 +101,10 @@ try {
         $clockStmt = $pdo->query('SELECT NOW() AS gate_time');
         $gateTimeValue = $clockStmt->fetchColumn();
         $gateTime = new DateTimeImmutable((string)$gateTimeValue);
-        $gateOutTime = new DateTimeImmutable((string)$pass['gate_out_time'], $gateTime->getTimezone());
-        if ($gateTime < $gateOutTime->modify('+24 hours')) {
-            $pdo->rollBack();
-            http_response_code(409);
-            echo json_encode(['success' => false, 'message' => 'Gate entry can only be recorded after 24 hours have elapsed since the gate exit.']);
-            exit;
-        }
-
-        $scheduledReturn = new DateTimeImmutable((string)$pass['end_date'], $gateTime->getTimezone());
+        $scheduledReturn = new DateTimeImmutable(
+            (string)$pass['end_date'] . ' ' . ((string)($pass['end_time'] ?? '') ?: '23:59:59'),
+            new DateTimeZone('Asia/Kolkata')
+        );
         $bufferDeadline = $scheduledReturn->modify('+30 minutes');
         $varianceSummary = null;
         if ($gateTime > $bufferDeadline) {

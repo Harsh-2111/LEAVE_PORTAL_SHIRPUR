@@ -21,7 +21,7 @@ if ($sapId === '' && $token === '') {
     exit;
 }
 
-$sql = 'SELECT lr.id, lr.sap_id, s.name AS student_name, s.gender, lr.room_no, lr.status, lr.pass_token, lr.qr_code_data, lr.start_date, lr.end_date, lr.reason, lr.gate_out_time, lr.gate_in_time, lr.return_timing_status, lr.variance_summary FROM leave_requests lr INNER JOIN students s ON s.sap_id = lr.sap_id WHERE lr.status IN (\'Granted\', \'CHECKED_OUT\', \'CHECKED_IN\') AND lr.pass_token IS NOT NULL';
+$sql = 'SELECT lr.id, lr.sap_id, s.name AS student_name, s.gender, lr.room_no, lr.status, lr.pass_token, lr.qr_code_data, lr.start_date, lr.start_time, lr.end_date, lr.end_time, lr.reason, lr.gate_out_time, lr.gate_in_time, lr.return_timing_status, lr.variance_summary FROM leave_requests lr INNER JOIN students s ON s.sap_id = lr.sap_id WHERE lr.status IN (\'Granted\', \'CHECKED_OUT\', \'CHECKED_IN\') AND lr.pass_token IS NOT NULL';
 $params = [];
 
 if ($user['role'] === 'warden') {
@@ -85,10 +85,7 @@ $gateDecision = $gateDecisionRow
 
 $gateEntryAvailable = false;
 if ($record['status'] === 'CHECKED_OUT' && $record['gate_out_time'] !== null && $record['gate_in_time'] === null) {
-    $clockStmt = $pdo->query('SELECT NOW()');
-    $gateTime = new DateTimeImmutable((string)$clockStmt->fetchColumn());
-    $gateOutTime = new DateTimeImmutable((string)$record['gate_out_time'], $gateTime->getTimezone());
-    $gateEntryAvailable = $gateTime >= $gateOutTime->modify('+24 hours');
+    $gateEntryAvailable = true;
 }
 
 $payload = [
@@ -102,7 +99,9 @@ $payload = [
     'valid_qr' => $validQr,
     'gate_decision' => $gateDecision,
     'start_date' => $record['start_date'],
+    'start_time' => $record['start_time'],
     'end_date' => $record['end_date'],
+    'end_time' => $record['end_time'],
     'reason' => $record['reason'],
     'gate_out_time' => $record['gate_out_time'],
     'gate_in_time' => $record['gate_in_time'],

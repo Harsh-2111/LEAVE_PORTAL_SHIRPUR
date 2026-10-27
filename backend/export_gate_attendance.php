@@ -40,7 +40,7 @@ $columns = $type === 'left'
 
 $sql = 'SELECT lr.sap_id, s.name AS student_name, s.hostel_block, COALESCE(lr.room_no, s.room_no) AS room_no, '
     . 's.parent_contact AS parent_phone, lr.hostel AS destination, lr.reason, '
-    . 'lr.gate_out_time, lr.end_date, lr.gate_in_time, lr.return_timing_status, lr.variance_summary '
+    . 'lr.gate_out_time, lr.end_date, lr.end_time, lr.gate_in_time, lr.return_timing_status, lr.variance_summary '
     . 'FROM leave_requests lr INNER JOIN students s ON s.sap_id = lr.sap_id '
     . 'WHERE s.gender = ? AND lr.' . $eventColumn . ' >= ? AND lr.' . $eventColumn . ' < ? '
     . 'ORDER BY lr.' . $eventColumn . ', s.name';
@@ -63,9 +63,10 @@ fwrite($output, "\xEF\xBB\xBF");
 fputcsv($output, $columns);
 
 while ($record = $stmt->fetch()) {
+    $scheduledReturn = trim((string)$record['end_date'] . ' ' . ((string)($record['end_time'] ?? '') ?: '23:59:59'));
     $values = $type === 'left'
-        ? [$record['sap_id'], $record['student_name'], $record['hostel_block'], $record['room_no'], $record['parent_phone'], $record['destination'], $record['reason'], $record['gate_out_time'], $record['end_date']]
-        : [$record['sap_id'], $record['student_name'], $record['hostel_block'], $record['room_no'], $record['parent_phone'], $record['destination'], $record['gate_out_time'], $record['end_date'], $record['gate_in_time'], $record['return_timing_status'], $record['variance_summary']];
+        ? [$record['sap_id'], $record['student_name'], $record['hostel_block'], $record['room_no'], $record['parent_phone'], $record['destination'], $record['reason'], $record['gate_out_time'], $scheduledReturn]
+        : [$record['sap_id'], $record['student_name'], $record['hostel_block'], $record['room_no'], $record['parent_phone'], $record['destination'], $record['gate_out_time'], $scheduledReturn, $record['gate_in_time'], $record['return_timing_status'], $record['variance_summary']];
     $values = array_map(static function ($value): string {
         $text = (string)($value ?? '');
         return preg_match('/^\s*[=+\-@]/', $text) === 1 ? "'" . $text : $text;

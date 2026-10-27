@@ -57,6 +57,16 @@ document.addEventListener('DOMContentLoaded', () => {
     return load;
   }
 
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, character => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    })[character]);
+  }
+
   function openChangePasswordModal() {
     if (!changePasswordModal) return;
     const form = document.getElementById('change-password-form');
@@ -550,7 +560,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <h1 class="text-3xl font-bold text-gray-800">Student Portal</h1>
             <div class="flex flex-wrap items-center gap-3">
               <div class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-2 shadow-sm" aria-label="Student profile">
-                <span class="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-blue-700" aria-hidden="true">
+                <span id="student-profile-icon" class="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-blue-700" aria-hidden="true">
                   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
                 </span>
                 <span id="student-profile-display-name" class="max-w-[180px] truncate text-sm font-semibold text-gray-700"></span>
@@ -568,8 +578,12 @@ document.addEventListener('DOMContentLoaded', () => {
             <label class="block text-sm font-medium text-gray-700">Full name
               <input id="student-profile-name" type="text" readonly required class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
             </label>
-            <label class="block text-sm font-medium text-gray-700">Student phone number
-              <input id="student-profile-contact" type="tel" readonly class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
+            <label class="block text-sm font-medium text-gray-700">Student mobile number
+              <span class="mt-2 flex w-full overflow-hidden rounded-lg border border-gray-300 bg-white focus-within:ring-2 focus-within:ring-blue-500">
+                <span class="flex items-center border-r border-gray-300 bg-gray-100 px-3 text-gray-700" aria-label="Country code +91">+91</span>
+                <input id="student-profile-contact" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10" pattern="[0-9]{10}" required class="min-w-0 flex-1 border-0 p-3 outline-none focus:ring-0" placeholder="10-digit mobile number" aria-describedby="student-contact-help" />
+              </span>
+              <span id="student-contact-help" class="mt-1 block text-xs text-gray-500">Enter exactly 10 digits. The +91 country code is fixed.</span>
             </label>
             <label class="block text-sm font-medium text-gray-700">Parent email
               <input id="student-profile-parent-email" type="email" readonly required class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
@@ -595,13 +609,22 @@ document.addEventListener('DOMContentLoaded', () => {
             <label class="block text-sm font-medium text-gray-700">Room number
               <input id="student-room-number" type="text" maxlength="50" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg" />
             </label>
-            <label class="block text-sm font-medium text-gray-700">Leave from
+            <label class="block text-sm font-medium text-gray-700">Leave from date
               <input id="student-leave-start" type="date" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg" />
             </label>
-            <label class="block text-sm font-medium text-gray-700">Leave to
+            <label class="block text-sm font-medium text-gray-700">Leave from time
+              <input id="student-leave-start-time" type="time" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg" />
+            </label>
+            <label class="block text-sm font-medium text-gray-700">Return date
               <input id="student-leave-end" type="date" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg" />
             </label>
+            <label class="block text-sm font-medium text-gray-700">Return time
+              <input id="student-leave-end-time" type="time" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg" />
+            </label>
             <p id="student-leave-days" class="md:col-span-2 text-sm text-gray-600" aria-live="polite">Select both dates to see the number of leave days.</p>
+            <label class="block text-sm font-medium text-gray-700 md:col-span-2">Home address
+              <textarea id="student-home-address" rows="2" maxlength="150" class="mt-2 w-full p-3 border border-gray-300 rounded-lg" placeholder="Enter your home address (up to 150 characters)"></textarea>
+            </label>
             <label class="block text-sm font-medium text-gray-700 md:col-span-2">Reason for leave
               <textarea id="student-leave-reason" rows="3" maxlength="2000" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg"></textarea>
             </label>
@@ -632,8 +655,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const hostelSelect = document.getElementById('student-hostel');
     const startInput = document.getElementById('student-leave-start');
     const endInput = document.getElementById('student-leave-end');
+    const startTimeInput = document.getElementById('student-leave-start-time');
+    const endTimeInput = document.getElementById('student-leave-end-time');
+    const studentContactInput = document.getElementById('student-profile-contact');
     const submitButton = document.getElementById('student-submit-leave');
     const profileDisplayName = document.getElementById('student-profile-display-name');
+    const profileIcon = document.getElementById('student-profile-icon');
     profileDisplayName.textContent = state.user.name || 'Student';
     const now = new Date();
     const localToday = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
@@ -650,9 +677,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const profile = result.student;
       state.user.name = profile.name || state.user.name;
       profileDisplayName.textContent = state.user.name || 'Student';
+      profileIcon.innerHTML = profile.gender === 'female'
+        ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M5 21c.7-4.1 3.1-6 7-6s6.3 1.9 7 6M12 11v4m-3-1h6"/></svg>'
+        : '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 21c.7-4.5 3.3-7 8-7s7.3 2.5 8 7"/></svg>';
       const fields = {
         'student-profile-name': profile.name,
-        'student-profile-contact': profile.student_contact,
         'student-profile-parent-email': profile.parent_email,
         'student-profile-parent-contact': profile.parent_contact,
         'student-profile-year': profile.year,
@@ -662,6 +691,7 @@ document.addEventListener('DOMContentLoaded', () => {
       Object.entries(fields).forEach(([id, value]) => {
         document.getElementById(id).value = value || '';
       });
+      studentContactInput.value = String(profile.student_contact || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
 
       expectedSchool = ['BTech', 'MBATech'].includes(profile.course) ? 'MPSTME' : 'SPTM';
       schoolSelect.innerHTML = `
@@ -672,7 +702,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ? ['NEW GIRLS HOSTEL', 'OLD GIRLS HOSTEL']
         : ['BOYS HOSTEL 1', 'NEW BOYS HOSTEL'];
       hostelSelect.innerHTML = '<option value="">Select hostel</option>' + hostels.map(hostel => `<option value="${hostel}">${hostel}</option>`).join('');
-      const requiredProfileFields = Object.entries(fields).filter(([id]) => id !== 'student-profile-contact');
+      const requiredProfileFields = Object.entries(fields);
       const profileComplete = requiredProfileFields.every(([, value]) => Boolean(value)) && Boolean(profile.gender && expectedSchool);
       submitButton.disabled = !profileComplete;
       if (!profileComplete) {
@@ -692,8 +722,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!startInput.value || !endInput.value) {
         output.textContent = 'Select both dates to see the number of leave days.';
         output.className = 'md:col-span-2 text-sm text-gray-600';
-      } else if (startInput.value >= endInput.value) {
-        output.textContent = 'Leave end date must be after the start date.';
+      } else if (
+        endInput.value < startInput.value
+        || (endInput.value === startInput.value && startTimeInput.value && endTimeInput.value && endTimeInput.value <= startTimeInput.value)
+      ) {
+        output.textContent = 'Return date and time must be after the leave start date and time.';
         output.className = 'md:col-span-2 text-sm text-red-600';
       } else {
         const start = new Date(`${startInput.value}T00:00:00Z`);
@@ -703,8 +736,10 @@ document.addEventListener('DOMContentLoaded', () => {
         output.className = 'md:col-span-2 text-sm text-gray-600';
       }
     };
-    startInput.addEventListener('change', updateLeaveDays);
-    endInput.addEventListener('change', updateLeaveDays);
+    [startInput, endInput, startTimeInput, endTimeInput].forEach(input => input.addEventListener('change', updateLeaveDays));
+    studentContactInput.addEventListener('input', () => {
+      studentContactInput.value = studentContactInput.value.replace(/\D/g, '').slice(0, 10);
+    });
 
     document.getElementById('student-leave-form').addEventListener('submit', async event => {
       event.preventDefault();
@@ -722,16 +757,26 @@ document.addEventListener('DOMContentLoaded', () => {
         message.className = 'text-sm text-red-600';
         return;
       }
-      if (startInput.value >= endInput.value) {
-        message.textContent = 'Leave end date must be after the start date.';
+      if (studentContactInput.value.length !== 10 || !/^\d{10}$/.test(studentContactInput.value)) {
+        studentContactInput.focus();
+        message.textContent = 'Enter exactly 10 digits for your mobile number.';
+        message.className = 'text-sm text-red-600';
+        return;
+      }
+      if (endInput.value < startInput.value || (endInput.value === startInput.value && endTimeInput.value <= startTimeInput.value)) {
+        message.textContent = 'Return date and time must be after the leave start date and time.';
         message.className = 'text-sm text-red-600';
         return;
       }
       submitButton.disabled = true;
       const requestData = getCsrfFormData({
         sap_id: sapInput.value,
+        student_contact: studentContactInput.value,
         start_date: startInput.value,
+        start_time: startTimeInput.value,
         end_date: endInput.value,
+        end_time: endTimeInput.value,
+        home_address: document.getElementById('student-home-address').value.trim(),
         reason: document.getElementById('student-leave-reason').value.trim(),
         school: schoolSelect.value,
         hostel: hostelSelect.value,
@@ -746,6 +791,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (result.success) {
           startInput.value = '';
           endInput.value = '';
+          startTimeInput.value = '';
+          endTimeInput.value = '';
+          document.getElementById('student-home-address').value = '';
           document.getElementById('student-leave-reason').value = '';
           document.getElementById('student-room-number').value = '';
           document.getElementById('student-details-confirmed').checked = false;
@@ -835,13 +883,13 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="overflow-x-auto">
           <table class="min-w-full bg-white border border-gray-300 rounded-lg">
             <thead class="bg-gray-200 text-gray-600 uppercase text-sm"><tr>
-              <th class="py-3 px-4 text-left">From</th><th class="py-3 px-4 text-left">To</th><th class="py-3 px-4 text-left">Room</th>
+              <th class="py-3 px-4 text-left">From</th><th class="py-3 px-4 text-left">To</th><th class="py-3 px-4 text-left">Room</th><th class="py-3 px-4 text-left">Address</th>
               <th class="py-3 px-4 text-left">Days</th><th class="py-3 px-4 text-left">School / Hostel</th>
               <th class="py-3 px-4 text-left">Reason</th><th class="py-3 px-4 text-left">Status</th><th class="py-3 px-4 text-left">Pass</th>
             </tr></thead>
             <tbody>${items.map(item => `
               <tr class="border-b border-gray-200 hover:bg-gray-100">
-                <td class="py-3 px-4">${item.start_date}</td><td class="py-3 px-4">${item.end_date}</td><td class="py-3 px-4">${item.room_no || '-'}</td>
+                <td class="py-3 px-4">${item.start_date} ${item.start_time || ''}</td><td class="py-3 px-4">${item.end_date} ${item.end_time || ''}</td><td class="py-3 px-4">${item.room_no || '-'}</td><td class="py-3 px-4">${escapeHtml(item.home_address || '-')}</td>
                 <td class="py-3 px-4">${item.leave_days}</td><td class="py-3 px-4">${item.school || '-'} / ${item.hostel || '-'}</td>
                 <td class="py-3 px-4">${item.reason}</td><td class="py-3 px-4">${item.status}</td>
                 <td class="py-3 px-4">${item.status === 'Granted' && item.qr_code_data ? `<button type="button" class="bg-blue-600 text-white px-3 py-1 rounded" data-qrcode="${item.id}">View</button>` : '-'}</td>
@@ -871,8 +919,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     target.innerHTML = `
       <p class="text-green-800 font-semibold">Pass token: ${pass.pass_token || 'Not available'}</p>
-      <p class="text-sm text-gray-700 mb-4">Valid ${pass.start_date} to ${pass.end_date}</p>
-      <div class="flex justify-center mb-4"><div class="p-10 bg-white rounded shadow-md"><div id="gate-pass-qr" role="img" aria-label="Gate pass QR code"></div></div></div>
+      <p class="text-sm text-gray-700 mb-4">Valid ${pass.start_date} ${pass.start_time || ''} to ${pass.end_date} ${pass.end_time || ''}</p>
+      <div class="gate-pass-qr-card flex justify-center mb-4"><div id="gate-pass-qr" role="img" aria-label="Gate pass QR code"></div></div>
       <div class="flex flex-wrap gap-3">
         <button type="button" id="download-gate-pass-qr" class="bg-blue-600 text-white px-4 py-2 rounded">Download QR</button>
         <button type="button" id="download-student-pdf" class="bg-purple-600 text-white px-4 py-2 rounded">Download PDF</button>
@@ -887,7 +935,8 @@ document.addEventListener('DOMContentLoaded', () => {
       () => typeof window.QRCode === 'function'
     ).then(() => {
       if (qrContainer.isConnected) {
-        new window.QRCode(qrContainer, { text: qrPayload, width: 320, height: 320, correctLevel: window.QRCode.CorrectLevel.H });
+        qrContainer.replaceChildren();
+        new window.QRCode(qrContainer, { text: qrPayload, width: 256, height: 256, correctLevel: window.QRCode.CorrectLevel.H });
       }
     }).catch(error => {
       console.error(error);
@@ -1192,8 +1241,10 @@ document.addEventListener('DOMContentLoaded', () => {
           [`${item.name || ''} (${item.sap_id || ''})`, 'font-semibold'],
           [`${item.course || ''} | ${item.year || ''} | ${item.gender || ''}`, ''],
           [`Room: ${item.room_no || '-'}`, ''],
-          [`Dates: ${item.start_date} to ${item.end_date} (${item.leave_days} days)`, ''],
+          [`Dates: ${item.start_date} ${item.start_time || ''} to ${item.end_date} ${item.end_time || ''} (${item.leave_days} days)`, ''],
           [`School / Hostel: ${item.school || '-'} / ${item.hostel || '-'}`, ''],
+          [`Student mobile: ${item.student_contact || 'Not provided'}`, ''],
+          [`Home address: ${item.home_address || 'Not provided'}`, ''],
           [`Reason: ${item.reason || '-'}`, ''],
           [`Call parent: ${item.parent_contact || 'Contact unavailable'} | ${item.parent_email || ''}`, '']
         ];
@@ -1497,7 +1548,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const values = {
           sap_id: item.sap_id,
           name: item.name,
-          dates: `${item.start_date} to ${item.end_date}`,
+          dates: `${item.start_date} ${item.start_time || ''} to ${item.end_date} ${item.end_time || ''}`,
           leave_days: item.leave_days,
           location: `${item.school || '-'} / ${item.hostel || '-'}`,
           reason: item.reason,

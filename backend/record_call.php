@@ -96,7 +96,7 @@ try {
     if ($outcome === 'Confirmed') {
         $secret = defined('QR_HMAC_SECRET') ? QR_HMAC_SECRET : 'change-me';
         $token = bin2hex(random_bytes(16));
-        $message = "GATE PASS\nStudent ID: {$leave['sap_id']}\nName: {$leave['student_name']}\nFrom: {$leave['start_date']}\nTill: {$leave['end_date']}\nApproved by Warden: {$user['name']}\nPass ID: {$token}";
+        $message = "GATE PASS\nStudent ID: {$leave['sap_id']}\nName: {$leave['student_name']}\nFrom: {$leave['start_date']} {$leave['start_time']}\nTill: {$leave['end_date']} {$leave['end_time']}\nApproved by Warden: {$user['name']}\nPass ID: {$token}";
         $signature = hash_hmac('sha256', $message, $secret);
         $qrData = $message . "\nSignature: {$signature}";
 

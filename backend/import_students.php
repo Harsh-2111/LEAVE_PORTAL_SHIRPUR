@@ -261,7 +261,14 @@ $studentColumns = [
 $studentPlaceholders = '(' . implode(', ', array_fill(0, count($studentColumns), '?'))
     . ', ' . (DB_DRIVER === 'pgsql' ? 'TRUE' : '1') . ', NOW())';
 $studentUpdate = implode(', ', array_map(
-    static fn(string $column): string => $column . ' = ' . (DB_DRIVER === 'pgsql' ? 'EXCLUDED.' . $column : 'VALUES(' . $column . ')'),
+    static function (string $column): string {
+        if ($column === 'student_contact') {
+            return DB_DRIVER === 'pgsql'
+                ? 'student_contact = COALESCE(EXCLUDED.student_contact, students.student_contact)'
+                : 'student_contact = COALESCE(VALUES(student_contact), student_contact)';
+        }
+        return $column . ' = ' . (DB_DRIVER === 'pgsql' ? 'EXCLUDED.' . $column : 'VALUES(' . $column . ')');
+    },
     array_slice($studentColumns, 1)
 ));
 

@@ -18,7 +18,8 @@ if (!in_array($user['warden_gender'] ?? '', ['male', 'female'], true)) {
     exit;
 }
 
-$date = trim((string)($_GET['date'] ?? date('Y-m-d')));
+$campusTimezone = new DateTimeZone('Asia/Kolkata');
+$date = trim((string)($_GET['date'] ?? (new DateTimeImmutable('now', $campusTimezone))->format('Y-m-d')));
 $filter = trim((string)($_GET['filter'] ?? 'all'));
 $parsedDate = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
 $dateErrors = DateTimeImmutable::getLastErrors();
@@ -52,7 +53,7 @@ switch ($filter) {
         $params[] = $nextDate;
         break;
     case 'defaulters':
-        $where[] = 'lr.status = ? AND lr.gate_out_time IS NOT NULL AND lr.gate_in_time IS NULL AND CURRENT_TIMESTAMP > lr.end_date';
+        $where[] = 'lr.status = ? AND lr.gate_out_time IS NOT NULL AND lr.gate_in_time IS NULL';
         $params[] = 'CHECKED_OUT';
         break;
     case 'all':
@@ -66,12 +67,9 @@ switch ($filter) {
 }
 
 $sql = 'SELECT lr.id, lr.sap_id, s.name AS student_name, COALESCE(lr.room_no, s.room_no) AS room_no, s.hostel_block, '
-    . 'lr.hostel AS destination, s.parent_contact AS parent_phone, lr.reason, lr.end_date, '
+    . 'lr.hostel AS destination, s.parent_contact AS parent_phone, lr.reason, lr.end_date, lr.end_time, '
     . 'lr.gate_out_time, lr.gate_in_time, lr.return_timing_status, lr.variance_summary, '
-    . 'CASE '
-    . 'WHEN lr.status = \'CHECKED_OUT\' AND lr.gate_in_time IS NULL AND CURRENT_TIMESTAMP > lr.end_date THEN \'OVERDUE\' '
-    . 'WHEN lr.status = \'CHECKED_OUT\' AND lr.gate_in_time IS NULL THEN \'CURRENTLY OUTSIDE\' '
-    . 'ELSE lr.return_timing_status END AS live_status, CURRENT_TIMESTAMP AS evaluated_at '
+    . 'lr.status, CURRENT_TIMESTAMP AS evaluated_at '
     . 'FROM leave_requests lr INNER JOIN students s ON s.sap_id = lr.sap_id '
     . 'WHERE ' . implode(' AND ', $where)
     . ' ORDER BY COALESCE(lr.gate_in_time, lr.gate_out_time) DESC, lr.id DESC';
@@ -80,10 +78,24 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $items = $stmt->fetchAll();
 
-foreach ($items as &$item) {
+foreach ($items as $index => &$item) {
+    $item['live_status'] = $item['return_timing_status'];
+    if ($item['status'] === 'CHECKED_OUT' && $item['gate_in_time'] === null) {
+        $now = new DateTimeImmutable((string)$item['evaluated_at']);
+        $deadline = new DateTimeImmutable(
+            (string)$item['end_date'] . ' ' . ((string)($item['end_time'] ?? '') ?: '23:59:59'),
+            $campusTimezone
+        );
+        $deadlineWithGrace = $deadline->modify('+30 minutes');
+        $item['live_status'] = $now > $deadlineWithGrace ? 'OVERDUE' : 'CURRENTLY OUTSIDE';
+    }
+
     if ($item['live_status'] === 'OVERDUE' && empty($item['variance_summary'])) {
         $now = new DateTimeImmutable((string)$item['evaluated_at']);
-        $deadline = new DateTimeImmutable((string)$item['end_date'], $now->getTimezone());
+        $deadline = new DateTimeImmutable(
+            (string)$item['end_date'] . ' ' . ((string)($item['end_time'] ?? '') ?: '23:59:59'),
+            $campusTimezone
+        );
         $seconds = max(0, $now->getTimestamp() - $deadline->getTimestamp());
         $days = intdiv($seconds, 86400);
         $hours = intdiv($seconds % 86400, 3600);
@@ -103,7 +115,11 @@ foreach ($items as &$item) {
         $item['variance_summary'] = 'Late by ' . implode(' ', $parts);
     }
     unset($item['evaluated_at']);
+    if ($filter === 'defaulters' && $item['live_status'] !== 'OVERDUE') {
+        unset($items[$index]);
+    }
 }
 unset($item);
+$items = array_values($items);
 
 echo json_encode(['success' => true, 'date' => $date, 'filter' => $filter, 'items' => $items]);

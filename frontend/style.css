@@ -258,6 +258,26 @@ button {
     color: #374151;
 }
 
+.gate-pass-qr-card {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+#gate-pass-qr {
+    display: flex;
+    max-width: 100%;
+    justify-content: center;
+}
+
+#gate-pass-qr canvas,
+#gate-pass-qr img {
+    display: block;
+    width: min(256px, 100%) !important;
+    height: auto !important;
+    max-width: 100%;
+}
+
 @media (min-width: 769px) and (max-width: 1100px) {
     #landing-page {
         grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);

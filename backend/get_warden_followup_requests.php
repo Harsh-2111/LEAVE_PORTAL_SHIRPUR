@@ -32,7 +32,7 @@ $fromSql =
 $params = [$user['warden_gender'], 'Pending Verification', 'Not Reachable', 'Wrong Person'];
 $stmt = $pdo->prepare(
     'SELECT lr.id, lr.sap_id, s.name, s.gender, s.course, s.year, s.branch, s.batch, '
-    . 's.parent_email, s.parent_contact, lr.start_date, lr.end_date, lr.leave_days, lr.reason, '
+    . 's.parent_email, s.parent_contact, s.student_contact, lr.start_date, lr.start_time, lr.end_date, lr.end_time, lr.leave_days, lr.reason, lr.home_address, '
     . 'lr.school, lr.hostel, lr.status, latest.outcome AS followup_outcome, latest.remarks AS followup_remarks, '
     . 'latest.called_at AS followup_called_at, caller.name AS called_by_name '
     . $fromSql

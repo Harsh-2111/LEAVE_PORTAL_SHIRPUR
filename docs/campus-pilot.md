@@ -6,11 +6,12 @@
 - Confirm the campus is authorized to use the student and guardian information in this portal. Do not send the real roster through chat or commit it to Git.
 - Keep database credentials and Supabase service-role keys on the server only. Do not put them in frontend files or share them with students.
 - Start with the provided CSV template and a small synthetic test file, then verify student login, password change, leave submission, Warden review, gate scanning, and exports.
+- Leave start and return times are campus local time (IST); verify same-day and overnight requests with the college before onboarding.
 - Wardens are currently scoped by student gender (Boys/Girls), not by individual hostel block. Confirm that this matches the campus' staff responsibilities before onboarding students.
 
 ## Database update
 
-Run `database/migration_leave_request_room_postgres.sql` once in Supabase SQL Editor before deploying this version. It adds a nullable room field to leave requests so students can enter their room when applying. For MySQL, use `database/migration_leave_request_room_mysql.sql`.
+Run `database/migration_leave_request_contact_address_times_postgres.sql` in Supabase SQL Editor before deploying this version. It adds the nullable leave start/return times and home address. For MySQL, use `database/migration_leave_request_contact_address_times_mysql.sql`. Also apply `database/migration_leave_request_room_postgres.sql` (or its MySQL equivalent) if the room-number migration has not already been run.
 
 For an existing database, also apply the gate-attendance indexes to speed up date-specific reports and attendance filters. These index migrations assume the gate timestamp columns already exist; if not, run the existing gate attendance migration first. In Supabase, run `database/migration_gate_attendance_indexes_postgres.sql` in SQL Editor. For MySQL, run this from the project directory:
 
