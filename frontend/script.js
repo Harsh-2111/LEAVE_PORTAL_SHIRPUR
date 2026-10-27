@@ -892,7 +892,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td class="py-3 px-4">${item.start_date} ${item.start_time || ''}</td><td class="py-3 px-4">${item.end_date} ${item.end_time || ''}</td><td class="py-3 px-4">${item.room_no || '-'}</td><td class="py-3 px-4">${escapeHtml(item.home_address || '-')}</td>
                 <td class="py-3 px-4">${item.leave_days}</td><td class="py-3 px-4">${item.school || '-'} / ${item.hostel || '-'}</td>
                 <td class="py-3 px-4">${item.reason}</td><td class="py-3 px-4">${item.status}</td>
-                <td class="py-3 px-4">${item.status === 'Granted' && item.qr_code_data ? `<button type="button" class="bg-blue-600 text-white px-3 py-1 rounded" data-qrcode="${item.id}">View</button>` : '-'}</td>
+                <td class="py-3 px-4">${['Granted', 'CHECKED_OUT'].includes(item.status) && item.qr_code_data ? `<button type="button" class="bg-blue-600 text-white px-3 py-1 rounded" data-qrcode="${item.id}">View</button>` : '-'}</td>
               </tr>`).join('')}</tbody>
           </table>
         </div>
@@ -903,7 +903,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (pass) renderGatePass(pass);
         });
       });
-      renderGatePass(items.find(item => item.status === 'Granted'));
+      renderGatePass(items.find(item => ['Granted', 'CHECKED_OUT'].includes(item.status) && item.qr_code_data));
     } catch (error) {
       console.error(error);
       target.innerHTML = '<p class="text-red-600">Unable to load history.</p>';
@@ -917,7 +917,11 @@ document.addEventListener('DOMContentLoaded', () => {
       target.innerHTML = '<p class="text-gray-500">No active gate pass available.</p>';
       return;
     }
+    const returnInstructions = pass.status === 'CHECKED_OUT'
+      ? '<p class="mb-3 rounded-lg bg-amber-100 p-3 font-semibold text-amber-900">You are currently checked out. Show this same QR code to security when you return so they can record your gate entry.</p>'
+      : '<p class="mb-3 rounded-lg bg-green-100 p-3 font-semibold text-green-900">Show this QR code to security when leaving campus.</p>';
     target.innerHTML = `
+      ${returnInstructions}
       <p class="text-green-800 font-semibold">Pass token: ${pass.pass_token || 'Not available'}</p>
       <p class="text-sm text-gray-700 mb-4">Valid ${pass.start_date} ${pass.start_time || ''} to ${pass.end_date} ${pass.end_time || ''}</p>
       <div class="gate-pass-qr-card flex justify-center mb-4"><div id="gate-pass-qr" role="img" aria-label="Gate pass QR code"></div></div>
