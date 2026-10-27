@@ -76,6 +76,9 @@ CREATE TABLE `leave_requests` (
   KEY `idx_leave_requests_sap_status` (`sap_id`, `status`),
   KEY `idx_leave_requests_status_created` (`status`, `created_at`),
   KEY `idx_leave_requests_dates` (`start_date`, `end_date`),
+  KEY `idx_leave_requests_gate_out` (`gate_out_time`),
+  KEY `idx_leave_requests_gate_in` (`gate_in_time`),
+  KEY `idx_leave_requests_status_gate_times` (`status`, `gate_out_time`, `gate_in_time`),
   CONSTRAINT `fk_leave_requests_student` FOREIGN KEY (`sap_id`) REFERENCES `students` (`sap_id`) ON UPDATE CASCADE,
   CONSTRAINT `fk_leave_requests_logged_by` FOREIGN KEY (`logged_by`) REFERENCES `users` (`id`) ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

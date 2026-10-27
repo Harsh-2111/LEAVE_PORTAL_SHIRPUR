@@ -23,15 +23,39 @@ document.addEventListener('DOMContentLoaded', () => {
     signupToken: '',
     signupCsrfToken: ''
   };
+  const optionalScriptLoads = new Map();
   let loginProgressTimer = null;
   let wardenAttendanceTimer = null;
   let securityQrScanner = null;
   let handlingSecurityScan = false;
+  let loadingWardenAttendance = false;
   let wardenPendingPage = 1;
   let wardenPendingTotal = 0;
   let wardenFollowupPage = 1;
   let wardenFollowupTotal = 0;
   let wardenApprovedPage = 1;
+
+  function loadOptionalScript(url, isAvailable) {
+    if (isAvailable()) return Promise.resolve();
+    if (optionalScriptLoads.has(url)) return optionalScriptLoads.get(url);
+
+    const load = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = url;
+      script.async = true;
+      script.onload = () => isAvailable()
+        ? resolve()
+        : reject(new Error('A required portal feature could not be initialized.'));
+      script.onerror = () => reject(new Error('A required portal feature could not be loaded. Check your connection and try again.'));
+      document.head.appendChild(script);
+    }).catch(error => {
+      optionalScriptLoads.delete(url);
+      throw error;
+    });
+
+    optionalScriptLoads.set(url, load);
+    return load;
+  }
 
   function openChangePasswordModal() {
     if (!changePasswordModal) return;
@@ -856,12 +880,21 @@ document.addEventListener('DOMContentLoaded', () => {
       <p id="gate-pass-download-message" class="mt-3 text-sm" aria-live="polite"></p>
     `;
     const qrContainer = document.getElementById('gate-pass-qr');
-    if (typeof window.QRCode === 'function') {
-      const qrPayload = pass.pass_token ? `HLP1:${pass.pass_token}` : pass.qr_code_data;
-      new window.QRCode(qrContainer, { text: qrPayload, width: 320, height: 320, correctLevel: window.QRCode.CorrectLevel.H });
-    } else {
-      qrContainer.textContent = 'QR generator unavailable. Use the pass token at the gate.';
-    }
+    qrContainer.textContent = 'Loading QR code...';
+    const qrPayload = pass.pass_token ? `HLP1:${pass.pass_token}` : pass.qr_code_data;
+    loadOptionalScript(
+      'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js',
+      () => typeof window.QRCode === 'function'
+    ).then(() => {
+      if (qrContainer.isConnected) {
+        new window.QRCode(qrContainer, { text: qrPayload, width: 320, height: 320, correctLevel: window.QRCode.CorrectLevel.H });
+      }
+    }).catch(error => {
+      console.error(error);
+      if (qrContainer.isConnected) {
+        qrContainer.textContent = 'QR generator unavailable. Use the pass token at the gate.';
+      }
+    });
 
     function createQuietZoneQr(sourceCanvas) {
       const quietZone = 40;
@@ -894,9 +927,13 @@ document.addEventListener('DOMContentLoaded', () => {
         message.className = 'mt-3 text-sm text-red-600';
       }
     });
-    document.getElementById('download-student-pdf').addEventListener('click', () => {
+    document.getElementById('download-student-pdf').addEventListener('click', async () => {
       const message = document.getElementById('gate-pass-download-message');
       try {
+        await loadOptionalScript(
+          'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+          () => Boolean(window.jspdf?.jsPDF)
+        );
         if (!window.jspdf?.jsPDF) throw new Error('PDF support did not load. Refresh the page and try again.');
         const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
         const pageWidth = pdf.internal.pageSize.getWidth();
@@ -1027,7 +1064,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('download-gate-departures').addEventListener('click', () => downloadGateReport('left'));
     document.getElementById('download-gate-arrivals').addEventListener('click', () => downloadGateReport('entered'));
     if (wardenAttendanceTimer !== null) clearInterval(wardenAttendanceTimer);
-    wardenAttendanceTimer = setInterval(loadWardenGateAttendance, 30000);
+    wardenAttendanceTimer = setInterval(() => {
+      if (!document.hidden) void loadWardenGateAttendance();
+    }, 60000);
     document.getElementById('warden-download-approved-csv').addEventListener('click', downloadWardenApprovedCsv);
   }
 
@@ -1035,8 +1074,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const target = document.getElementById('warden-gate-attendance');
     const dateInput = document.getElementById('attendanceDate');
     const filterInput = document.getElementById('gateAttendanceFilter');
-    if (!target || !dateInput || !filterInput || !dateInput.value) return;
+    if (!target || !dateInput || !filterInput || !dateInput.value || loadingWardenAttendance) return;
     target.className = 'overflow-x-auto';
+    loadingWardenAttendance = true;
 
     try {
       const params = new URLSearchParams({ date: dateInput.value, filter: filterInput.value });
@@ -1100,6 +1140,8 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error(error);
       target.textContent = error.message || 'Unable to load gate attendance.';
       target.className = 'overflow-x-auto text-sm text-red-600';
+    } finally {
+      loadingWardenAttendance = false;
     }
   }
 
@@ -1771,8 +1813,14 @@ document.addEventListener('DOMContentLoaded', () => {
       showMessage(result, 'Camera scanning requires HTTPS and camera permission. Open the secure site on your device.', 'error');
       return;
     }
-    if (typeof window.Html5Qrcode !== 'function') {
-      showMessage(result, 'QR scanner did not load. Refresh the page and try again.', 'error');
+    try {
+      await loadOptionalScript(
+        'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
+        () => typeof window.Html5Qrcode === 'function'
+      );
+    } catch (error) {
+      console.error(error);
+      showMessage(result, error.message || 'QR scanner could not be loaded. Try again.', 'error');
       return;
     }
 
@@ -1993,6 +2041,11 @@ document.addEventListener('DOMContentLoaded', () => {
   roleSelect.addEventListener('change', updateRoleTitle);
   document.addEventListener('click', event => {
     if (event.target.closest('[data-logout-button]')) logoutModal.classList.remove('hidden');
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && document.getElementById('warden-gate-attendance')) {
+      void loadWardenGateAttendance();
+    }
   });
   document.getElementById('cancel-change-password')?.addEventListener('click', closeChangePasswordModal);
   document.getElementById('close-change-password-modal')?.addEventListener('click', closeChangePasswordModal);

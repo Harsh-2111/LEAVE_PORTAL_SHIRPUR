@@ -12,6 +12,12 @@
 
 Run `database/migration_leave_request_room_postgres.sql` once in Supabase SQL Editor before deploying this version. It adds a nullable room field to leave requests so students can enter their room when applying. For MySQL, use `database/migration_leave_request_room_mysql.sql`.
 
+For an existing database, also apply the gate-attendance indexes to speed up date-specific reports and attendance filters. These index migrations assume the gate timestamp columns already exist; if not, run the existing gate attendance migration first. In Supabase, run `database/migration_gate_attendance_indexes_postgres.sql` in SQL Editor. For MySQL, run this from the project directory:
+
+```powershell
+Get-Content -Raw .\database\migration_gate_attendance_indexes_mysql.sql | docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" hostel_leave'
+```
+
 No additional database migration is required for student self-signup. The importer updates roster records only; it no longer creates or resets student passwords. Existing temporary-password accounts can be claimed through signup after the student's SAP ID and parent contact details are matched. If you already ran the previous activation migration, leave its unused student email column and token table in place; do not rerun or manually drop them.
 
 ## Roster import
@@ -26,4 +32,4 @@ The parent contact and email check is a roster match, not a one-time verificatio
 
 ## Capacity and operations
 
-The importer writes profiles in batches and is designed for a pilot roster up to 2,500 rows. Warden pending and follow-up queues are paginated; approved-history tables also load one page at a time. Run a full 600-student synthetic pilot on the actual deployment and database plan before production use. Monitor PHP request timeouts, database connection limits, backups, and Supabase usage; capacity depends on the hosting tier and concurrent traffic, not only the student count.
+The importer writes profiles in batches and is designed for a pilot roster up to 2,500 rows. Warden pending and follow-up queues are paginated; approved-history tables also load one page at a time. Gate attendance refresh pauses in hidden tabs and checks for updates once per minute while visible. Run a full 600-student synthetic pilot on the actual deployment and database plan before production use. Monitor PHP request timeouts, database connection limits, backups, and Supabase usage; capacity depends on the hosting tier and concurrent traffic, not only the student count. Database indexes and lighter polling help, but they do not increase the connection or compute limits of the selected hosting plan.

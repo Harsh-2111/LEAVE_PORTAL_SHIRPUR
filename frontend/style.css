@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
 body {
     font-family: 'Inter', sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -11,8 +9,14 @@ body {
     background-size: cover;
     background-position: center center;
     background-repeat: no-repeat;
-    background-attachment: fixed;
+    background-attachment: scroll;
     overflow-x: hidden;
+    align-items: flex-start;
+    justify-content: center;
+}
+
+body.items-center {
+    align-items: flex-start;
 }
 
 *, *::before, *::after {
@@ -28,9 +32,10 @@ body {
     background-color: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.3);
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(50px);
-    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     overflow-x: hidden;
+    margin: auto;
 }
 
 #app-container.portal-wide {
@@ -253,14 +258,31 @@ button {
     color: #374151;
 }
 
+@media (min-width: 769px) and (max-width: 1100px) {
+    #landing-page {
+        grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+    }
+
+    #landing-info {
+        padding: 2.25rem;
+    }
+
+    #login-panel {
+        padding: 1.75rem;
+    }
+}
+
 @media (max-width: 768px) {
     body {
-        padding: 0.75rem;
+        padding: 0.5rem;
     }
 
     #app-container {
-        padding: 1rem;
+        width: 100%;
+        padding: 0.9rem;
         border-radius: 0.9rem;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
     }
 
     #app-container.login-shell {
@@ -290,6 +312,10 @@ button {
         padding: 1.75rem;
     }
 
+    #app-container.portal-wide {
+        max-width: 100% !important;
+    }
+
     button,
     input,
     select,
@@ -297,14 +323,13 @@ button {
         font-size: 16px;
     }
 
-    .flex.gap-2,
-    .flex.gap-3,
-    .flex.gap-4 {
-        flex-direction: column;
+    .gate-attendance-controls {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
     }
 
-    .grid {
-        grid-template-columns: 1fr !important;
+    .gate-attendance-controls > * {
+        width: 100%;
     }
 
     .w-full,
@@ -319,15 +344,25 @@ button {
     table {
         min-width: 640px;
     }
+
+    #student-page,
+    #teacher-page,
+    #admin-page,
+    #security-page {
+        width: 100%;
+    }
 }
 
 @media (max-width: 480px) {
     body {
-        padding: 0.5rem;
+        padding: 0;
     }
 
     #app-container {
-        padding: 0.8rem;
+        padding: 0.65rem;
+        border-radius: 0;
+        border-left: 0;
+        border-right: 0;
     }
 
     #app-container.login-shell {
@@ -336,16 +371,49 @@ button {
 
     #landing-info,
     #login-panel {
-        padding: 1.25rem;
+        padding: 1.1rem;
     }
 
-    h1 {
-        font-size: clamp(1.6rem, 7vw, 2.3rem);
+    #landing-title {
+        font-size: clamp(1.55rem, 7vw, 2rem);
     }
 
-    h2,
-    h3 {
-        font-size: clamp(1.1rem, 5vw, 1.6rem);
+    #student-page section,
+    #teacher-page section,
+    #admin-page section,
+    #security-page section {
+        padding: 0.9rem;
+    }
+
+    .gate-export-button {
+        padding: 0.7rem 0.75rem;
+        font-size: 0.9rem;
+    }
+
+    .gate-status-badge {
+        max-width: 14rem;
+    }
+
+    #student-profile-display-name {
+        max-width: 8rem;
+    }
+
+    #signup-modal > div,
+    #forgot-password-modal > div,
+    #change-password-modal > div {
+        max-height: calc(100svh - 1rem);
+        overflow-y: auto;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
     }
 }
 

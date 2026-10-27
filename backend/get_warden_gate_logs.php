@@ -26,6 +26,7 @@ $validDate = $parsedDate !== false
     && ($dateErrors === false || ($dateErrors['warning_count'] === 0 && $dateErrors['error_count'] === 0))
     && $parsedDate->format('Y-m-d') === $date;
 $filters = ['all', 'outside', 'exited_today', 'entered_today', 'defaulters'];
+$nextDate = $validDate ? $parsedDate->modify('+1 day')->format('Y-m-d') : '';
 
 if (!$validDate || !in_array($filter, $filters, true)) {
     http_response_code(400);
@@ -41,21 +42,25 @@ switch ($filter) {
         $params[] = 'CHECKED_OUT';
         break;
     case 'exited_today':
-        $where[] = 'CAST(lr.gate_out_time AS DATE) = ?';
+        $where[] = 'lr.gate_out_time >= ? AND lr.gate_out_time < ?';
         $params[] = $date;
+        $params[] = $nextDate;
         break;
     case 'entered_today':
-        $where[] = 'CAST(lr.gate_in_time AS DATE) = ?';
+        $where[] = 'lr.gate_in_time >= ? AND lr.gate_in_time < ?';
         $params[] = $date;
+        $params[] = $nextDate;
         break;
     case 'defaulters':
         $where[] = 'lr.status = ? AND lr.gate_out_time IS NOT NULL AND lr.gate_in_time IS NULL AND CURRENT_TIMESTAMP > lr.end_date';
         $params[] = 'CHECKED_OUT';
         break;
     case 'all':
-        $where[] = '(CAST(lr.gate_out_time AS DATE) = ? OR CAST(lr.gate_in_time AS DATE) = ? OR (lr.status = ? AND lr.gate_in_time IS NULL))';
+        $where[] = '((lr.gate_out_time >= ? AND lr.gate_out_time < ?) OR (lr.gate_in_time >= ? AND lr.gate_in_time < ?) OR (lr.status = ? AND lr.gate_in_time IS NULL))';
         $params[] = $date;
+        $params[] = $nextDate;
         $params[] = $date;
+        $params[] = $nextDate;
         $params[] = 'CHECKED_OUT';
         break;
 }
