@@ -15,6 +15,7 @@ if (!in_array($user['warden_gender'] ?? '', ['male', 'female'], true)) {
     echo json_encode(['success' => false, 'message' => 'Warden account has no hostel-group assignment.']);
     exit;
 }
+$wardenHostel = requireWardenHostel($user);
 requireCsrfToken();
 
 $leaveId = (int)($_POST['leave_id'] ?? 0);
@@ -53,10 +54,10 @@ try {
         exit;
     }
 
-    if ($leave['gender'] !== $user['warden_gender']) {
+    if ($leave['gender'] !== $user['warden_gender'] || $leave['hostel'] !== $wardenHostel) {
         $pdo->rollBack();
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'This request belongs to the other warden group.']);
+        echo json_encode(['success' => false, 'message' => 'This request belongs to another hostel warden.']);
         exit;
     }
 

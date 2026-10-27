@@ -47,4 +47,13 @@ if ($user['role'] === 'warden' && ($user['warden_gender'] ?? '') !== $student['g
     exit;
 }
 
+if (
+    $user['role'] === 'warden'
+    && strtoupper(trim((string)($student['hostel_block'] ?? ''))) !== requireWardenHostel($user)
+) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'This student belongs to another hostel warden.']);
+    exit;
+}
+
 echo json_encode(['success' => true, 'student' => $student]);

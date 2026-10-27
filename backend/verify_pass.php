@@ -21,7 +21,12 @@ if ($sapId === '' && $token === '') {
     exit;
 }
 
-$sql = 'SELECT lr.id, lr.sap_id, s.name AS student_name, s.gender, lr.room_no, lr.status, lr.pass_token, lr.qr_code_data, lr.start_date, lr.start_time, lr.end_date, lr.end_time, lr.reason, lr.gate_out_time, lr.gate_in_time, lr.return_timing_status, lr.variance_summary FROM leave_requests lr INNER JOIN students s ON s.sap_id = lr.sap_id WHERE lr.status IN (\'Granted\', \'CHECKED_OUT\', \'CHECKED_IN\') AND lr.pass_token IS NOT NULL';
+$entryEligibility = DB_DRIVER === 'pgsql'
+    ? "(lr.gate_out_time IS NOT NULL AND lr.gate_out_time <= NOW() - INTERVAL '24 hours')"
+    : '(lr.gate_out_time IS NOT NULL AND lr.gate_out_time <= NOW() - INTERVAL 24 HOUR)';
+$sql = 'SELECT lr.id, lr.sap_id, s.name AS student_name, s.gender, lr.room_no, lr.status, lr.pass_token, lr.qr_code_data, lr.start_date, lr.start_time, lr.end_date, lr.end_time, lr.reason, lr.gate_out_time, lr.gate_in_time, lr.return_timing_status, lr.variance_summary, CASE WHEN '
+    . $entryEligibility
+    . ' THEN 1 ELSE 0 END AS gate_entry_available FROM leave_requests lr INNER JOIN students s ON s.sap_id = lr.sap_id WHERE lr.status IN (\'Granted\', \'CHECKED_OUT\', \'CHECKED_IN\') AND lr.pass_token IS NOT NULL';
 $params = [];
 
 if ($user['role'] === 'warden') {
@@ -30,8 +35,9 @@ if ($user['role'] === 'warden') {
         echo json_encode(['success' => false, 'message' => 'Warden account has no hostel-group assignment.']);
         exit;
     }
-    $sql .= ' AND s.gender = ?';
+    $sql .= ' AND s.gender = ? AND lr.hostel = ?';
     $params[] = $user['warden_gender'];
+    $params[] = requireWardenHostel($user);
 }
 
 if ($sapId !== '') {
@@ -85,7 +91,7 @@ $gateDecision = $gateDecisionRow
 
 $gateEntryAvailable = false;
 if ($record['status'] === 'CHECKED_OUT' && $record['gate_out_time'] !== null && $record['gate_in_time'] === null) {
-    $gateEntryAvailable = true;
+    $gateEntryAvailable = databaseBool($record['gate_entry_available']);
 }
 
 $payload = [

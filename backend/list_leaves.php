@@ -34,8 +34,9 @@ if ($user['role'] === 'warden') {
         echo json_encode(['success' => false, 'message' => 'Warden account has no hostel-group assignment.']);
         exit;
     }
-    $where[] = 's.gender = ?';
+    $where[] = 's.gender = ? AND lr.hostel = ?';
     $params[] = $user['warden_gender'];
+    $params[] = requireWardenHostel($user);
 }
 
 if ($sapId !== '') {

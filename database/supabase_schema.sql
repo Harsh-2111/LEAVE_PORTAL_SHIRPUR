@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS public.users (
   password_hash VARCHAR(255) NOT NULL,
   role VARCHAR(20) NOT NULL CHECK (role IN ('student', 'warden', 'admin', 'security')),
   warden_gender VARCHAR(10) CHECK (warden_gender IN ('male', 'female')),
+  warden_hostel VARCHAR(40) CHECK (warden_hostel IN ('BOYS HOSTEL 1', 'NEW BOYS HOSTEL', 'NEW GIRLS HOSTEL', 'OLD GIRLS HOSTEL')),
   name VARCHAR(150) NOT NULL,
   must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,

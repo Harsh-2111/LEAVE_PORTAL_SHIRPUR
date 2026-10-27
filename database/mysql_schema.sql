@@ -37,6 +37,7 @@ CREATE TABLE `users` (
   `password_hash` VARCHAR(255) NOT NULL,
   `role` ENUM('student','warden','admin','security') NOT NULL,
   `warden_gender` ENUM('male','female') DEFAULT NULL,
+  `warden_hostel` ENUM('BOYS HOSTEL 1','NEW BOYS HOSTEL','NEW GIRLS HOSTEL','OLD GIRLS HOSTEL') DEFAULT NULL,
   `name` VARCHAR(150) NOT NULL,
   `must_change_password` TINYINT(1) NOT NULL DEFAULT 0,
   `is_active` TINYINT(1) NOT NULL DEFAULT 1,

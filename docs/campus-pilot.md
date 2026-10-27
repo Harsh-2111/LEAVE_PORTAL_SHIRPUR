@@ -7,11 +7,13 @@
 - Keep database credentials and Supabase service-role keys on the server only. Do not put them in frontend files or share them with students.
 - Start with the provided CSV template and a small synthetic test file, then verify student login, password change, leave submission, Warden review, gate scanning, and exports.
 - Leave start and return times are campus local time (IST); verify same-day and overnight requests with the college before onboarding.
-- Wardens are currently scoped by student gender (Boys/Girls), not by individual hostel block. Confirm that this matches the campus' staff responsibilities before onboarding students.
+- Each Warden is scoped to one assigned hostel block; confirm the four login-to-hostel assignments with campus staff before onboarding.
 
 ## Database update
 
 Run `database/migration_leave_request_contact_address_times_postgres.sql` in Supabase SQL Editor before deploying this version. It adds the nullable leave start/return times and home address. For MySQL, use `database/migration_leave_request_contact_address_times_mysql.sql`. Also apply `database/migration_leave_request_room_postgres.sql` (or its MySQL equivalent) if the room-number migration has not already been run.
+
+For four-hostel warden separation, run `database/migration_warden_hostel_scope_postgres.sql` in Supabase SQL Editor (or `database/migration_warden_hostel_scope_mysql.sql` for MySQL). It assigns `warden1` to New Boys Hostel, `warden2` to Boys Hostel 1, `warden3` to New Girls Hostel, and `warden4` to Old Girls Hostel. The new accounts require a password change at first login; their temporary passwords are provided separately to the administrator. Existing wardens must sign out and back in after migration for the hostel assignment to load.
 
 For an existing database, also apply the gate-attendance indexes to speed up date-specific reports and attendance filters. These index migrations assume the gate timestamp columns already exist; if not, run the existing gate attendance migration first. In Supabase, run `database/migration_gate_attendance_indexes_postgres.sql` in SQL Editor. For MySQL, run this from the project directory:
 

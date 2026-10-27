@@ -133,6 +133,19 @@ function requireRole(array $roles): array
     return $user;
 }
 
+function requireWardenHostel(array $user): string
+{
+    $hostel = (string)($user['warden_hostel'] ?? '');
+    $allowedHostels = ['BOYS HOSTEL 1', 'NEW BOYS HOSTEL', 'NEW GIRLS HOSTEL', 'OLD GIRLS HOSTEL'];
+    if ($user['role'] !== 'warden' || !in_array($hostel, $allowedHostels, true)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Warden account has no hostel assignment.']);
+        exit;
+    }
+
+    return $hostel;
+}
+
 function requirePasswordChangeComplete(array $user): void
 {
     if (databaseBool($user['must_change_password'] ?? false)) {

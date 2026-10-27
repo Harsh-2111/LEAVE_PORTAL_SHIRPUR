@@ -17,9 +17,9 @@ $stmt = $pdo->prepare(
     . 'INNER JOIN leave_requests lr ON lr.id = a.entity_id '
     . 'INNER JOIN students s ON s.sap_id = lr.sap_id '
     . 'INNER JOIN users u ON u.id = a.user_id '
-    . 'WHERE a.entity = ? AND a.action IN (?, ?) AND u.role = ? '
+    . 'WHERE a.entity = ? AND a.action IN (?, ?) AND u.role = ? AND lr.status <> ? '
     . 'ORDER BY a.created_at DESC LIMIT 200'
 );
-$stmt->execute(['leave_requests', 'gate_pass_accepted', 'gate_pass_rejected', 'security']);
+$stmt->execute(['leave_requests', 'gate_pass_accepted', 'gate_pass_rejected', 'security', 'CHECKED_IN']);
 
 echo json_encode(['success' => true, 'items' => $stmt->fetchAll()]);

@@ -24,7 +24,15 @@ if ($leaveId <= 0 || $passToken === '' || !in_array($decision, ['accept', 'rejec
 
 try {
     $pdo->beginTransaction();
-    $stmt = $pdo->prepare('SELECT sap_id, qr_code_data, status, end_date, end_time, gate_out_time, gate_in_time FROM leave_requests WHERE id = ? AND pass_token = ? AND status IN (\'Granted\', \'CHECKED_OUT\', \'CHECKED_IN\') LIMIT 1 FOR UPDATE');
+    $entryEligibility = DB_DRIVER === 'pgsql'
+        ? "(gate_out_time IS NOT NULL AND gate_out_time <= NOW() - INTERVAL '24 hours')"
+        : '(gate_out_time IS NOT NULL AND gate_out_time <= NOW() - INTERVAL 24 HOUR)';
+    $stmt = $pdo->prepare(
+        'SELECT sap_id, qr_code_data, status, end_date, end_time, gate_out_time, gate_in_time, '
+        . 'CASE WHEN ' . $entryEligibility . ' THEN 1 ELSE 0 END AS gate_entry_available '
+        . 'FROM leave_requests WHERE id = ? AND pass_token = ? '
+        . 'AND status IN (\'Granted\', \'CHECKED_OUT\', \'CHECKED_IN\') LIMIT 1 FOR UPDATE'
+    );
     $stmt->execute([$leaveId, $passToken]);
     $pass = $stmt->fetch();
 
@@ -91,10 +99,15 @@ try {
             exit;
         }
 
-        if ($pass['status'] !== 'CHECKED_OUT' || $pass['gate_out_time'] === null || $pass['gate_in_time'] !== null) {
+        if (
+            $pass['status'] !== 'CHECKED_OUT'
+            || $pass['gate_out_time'] === null
+            || $pass['gate_in_time'] !== null
+            || !databaseBool($pass['gate_entry_available'])
+        ) {
             $pdo->rollBack();
             http_response_code(409);
-            echo json_encode(['success' => false, 'message' => 'This pass cannot be used to record a gate entry.']);
+            echo json_encode(['success' => false, 'message' => 'Gate entry can only be recorded after 24 hours from the gate exit.']);
             exit;
         }
 

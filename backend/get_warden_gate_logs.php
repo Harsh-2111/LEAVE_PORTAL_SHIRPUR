@@ -17,6 +17,7 @@ if (!in_array($user['warden_gender'] ?? '', ['male', 'female'], true)) {
     echo json_encode(['success' => false, 'message' => 'Warden account has no hostel-group assignment.']);
     exit;
 }
+$wardenHostel = requireWardenHostel($user);
 
 $campusTimezone = new DateTimeZone('Asia/Kolkata');
 $date = trim((string)($_GET['date'] ?? (new DateTimeImmutable('now', $campusTimezone))->format('Y-m-d')));
@@ -35,8 +36,8 @@ if (!$validDate || !in_array($filter, $filters, true)) {
     exit;
 }
 
-$where = ['s.gender = ?'];
-$params = [$user['warden_gender']];
+$where = ['s.gender = ?', 'lr.hostel = ?'];
+$params = [$user['warden_gender'], $wardenHostel];
 switch ($filter) {
     case 'outside':
         $where[] = 'lr.status = ? AND lr.gate_out_time IS NOT NULL AND lr.gate_in_time IS NULL';

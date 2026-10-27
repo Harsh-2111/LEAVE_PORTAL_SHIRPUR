@@ -677,9 +677,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const profile = result.student;
       state.user.name = profile.name || state.user.name;
       profileDisplayName.textContent = state.user.name || 'Student';
-      profileIcon.innerHTML = profile.gender === 'female'
-        ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M5 21c.7-4.1 3.1-6 7-6s6.3 1.9 7 6M12 11v4m-3-1h6"/></svg>'
-        : '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 21c.7-4.5 3.3-7 8-7s7.3 2.5 8 7"/></svg>';
+      profileIcon.textContent = profile.gender === 'female' ? '👧' : '👦';
+      profileIcon.setAttribute('aria-label', profile.gender === 'female' ? 'Girl student' : 'Boy student');
       const fields = {
         'student-profile-name': profile.name,
         'student-profile-parent-email': profile.parent_email,
@@ -1057,7 +1056,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hideAllPages();
     appContainer.classList.add('portal-wide');
     wardenPage.classList.remove('hidden');
-    const hostelGroup = state.user?.warden_gender === 'female' ? 'Girls Hostel' : 'Boys Hostel';
+    const hostelGroup = state.user?.warden_hostel || 'Assigned Hostel';
     wardenPendingPage = 1;
     wardenFollowupPage = 1;
     wardenApprovedPage = 1;
@@ -1733,6 +1732,11 @@ document.addEventListener('DOMContentLoaded', () => {
       entryButton.addEventListener('click', () => submitGateDecision(result, 'entry', actions));
       actions.appendChild(entryButton);
       card.appendChild(actions);
+    } else if (result.valid_qr && result.status === 'CHECKED_OUT' && hasExited && !hasEntered) {
+      const notice = document.createElement('p');
+      notice.className = 'mt-4 rounded-lg bg-amber-100 p-3 text-sm font-semibold text-amber-900';
+      notice.textContent = 'Gate entry can be recorded after 24 hours have elapsed from the recorded gate exit.';
+      card.appendChild(notice);
     }
 
     target.replaceChildren(card);

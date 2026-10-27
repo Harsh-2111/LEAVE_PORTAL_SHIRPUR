@@ -17,6 +17,7 @@ if (!in_array($user['warden_gender'] ?? '', ['male', 'female'], true)) {
     echo json_encode(['success' => false, 'message' => 'Warden account has no hostel-group assignment.']);
     exit;
 }
+$wardenHostel = requireWardenHostel($user);
 
 $page = max(1, (int)($_GET['page'] ?? 1));
 $limit = min(100, max(1, (int)($_GET['limit'] ?? 20)));
@@ -28,8 +29,8 @@ $fromSql =
     . 'SELECT MAX(latest_call.id) FROM leave_call_log latest_call WHERE latest_call.leave_id = lr.id'
     . ') '
     . 'INNER JOIN users caller ON caller.id = latest.called_by '
-    . 'WHERE s.gender = ? AND lr.status = ? AND latest.outcome IN (?, ?)';
-$params = [$user['warden_gender'], 'Pending Verification', 'Not Reachable', 'Wrong Person'];
+    . 'WHERE s.gender = ? AND lr.hostel = ? AND lr.status = ? AND latest.outcome IN (?, ?)';
+$params = [$user['warden_gender'], $wardenHostel, 'Pending Verification', 'Not Reachable', 'Wrong Person'];
 $stmt = $pdo->prepare(
     'SELECT lr.id, lr.sap_id, s.name, s.gender, s.course, s.year, s.branch, s.batch, '
     . 's.parent_email, s.parent_contact, s.student_contact, lr.start_date, lr.start_time, lr.end_date, lr.end_time, lr.leave_days, lr.reason, lr.home_address, '

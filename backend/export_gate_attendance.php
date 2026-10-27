@@ -16,6 +16,7 @@ if (!in_array($user['warden_gender'] ?? '', ['male', 'female'], true)) {
     echo json_encode(['success' => false, 'message' => 'Warden account has no hostel-group assignment.']);
     exit;
 }
+$wardenHostel = requireWardenHostel($user);
 
 $date = trim((string)($_GET['date'] ?? ''));
 $type = trim((string)($_GET['type'] ?? ''));
@@ -42,10 +43,10 @@ $sql = 'SELECT lr.sap_id, s.name AS student_name, s.hostel_block, COALESCE(lr.ro
     . 's.parent_contact AS parent_phone, lr.hostel AS destination, lr.reason, '
     . 'lr.gate_out_time, lr.end_date, lr.end_time, lr.gate_in_time, lr.return_timing_status, lr.variance_summary '
     . 'FROM leave_requests lr INNER JOIN students s ON s.sap_id = lr.sap_id '
-    . 'WHERE s.gender = ? AND lr.' . $eventColumn . ' >= ? AND lr.' . $eventColumn . ' < ? '
+    . 'WHERE s.gender = ? AND lr.hostel = ? AND lr.' . $eventColumn . ' >= ? AND lr.' . $eventColumn . ' < ? '
     . 'ORDER BY lr.' . $eventColumn . ', s.name';
 $stmt = $pdo->prepare($sql);
-$stmt->execute([$user['warden_gender'], $date, $nextDate]);
+$stmt->execute([$user['warden_gender'], $wardenHostel, $date, $nextDate]);
 
 $filename = $type === 'left'
     ? 'Hostel_Gate_Departures_' . $date . '.csv'
