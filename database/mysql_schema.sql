@@ -79,6 +79,8 @@ CREATE TABLE `leave_requests` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_leave_pass_token` (`pass_token`),
   KEY `idx_leave_requests_sap_status` (`sap_id`, `status`),
+  KEY `idx_leave_requests_sap_created` (`sap_id`, `created_at`),
+  KEY `idx_leave_requests_hostel_status_end_created` (`hostel`, `status`, `end_date`, `created_at`),
   KEY `idx_leave_requests_status_created` (`status`, `created_at`),
   KEY `idx_leave_requests_dates` (`start_date`, `end_date`),
   KEY `idx_leave_requests_gate_out` (`gate_out_time`),

@@ -69,6 +69,8 @@ CREATE TABLE IF NOT EXISTS public.leave_requests (
 );
 
 CREATE INDEX IF NOT EXISTS idx_leave_requests_sap_status ON public.leave_requests (sap_id, status);
+CREATE INDEX IF NOT EXISTS idx_leave_requests_sap_created ON public.leave_requests (sap_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_leave_requests_hostel_status_end_created ON public.leave_requests (hostel, status, end_date, created_at);
 CREATE INDEX IF NOT EXISTS idx_leave_requests_status_created ON public.leave_requests (status, created_at);
 CREATE INDEX IF NOT EXISTS idx_leave_requests_dates ON public.leave_requests (start_date, end_date);
 CREATE INDEX IF NOT EXISTS idx_leave_requests_gate_out ON public.leave_requests (gate_out_time);
