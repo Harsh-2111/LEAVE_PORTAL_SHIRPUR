@@ -135,9 +135,16 @@ body.items-center {
 }
 
 #student-forgot-password-button {
-    display: block;
-    width: 100%;
-    text-align: right;
+    display: inline-flex;
+    width: auto;
+    flex: 0 0 auto;
+    white-space: nowrap;
+    text-align: center;
+}
+
+#student-signup-button {
+    flex: 0 0 auto;
+    white-space: nowrap;
 }
 
 input[type="text"],
@@ -224,9 +231,12 @@ button {
 
 .gate-status-badge {
     display: inline-flex;
-    max-width: 18rem;
+    max-width: min(12rem, 100%);
+    min-width: 0;
     align-items: center;
     white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
     border-radius: 9999px;
     padding: 0.3rem 0.65rem;
     font-size: 0.75rem;
@@ -427,7 +437,11 @@ button {
     }
 
     .gate-status-badge {
-        max-width: 14rem;
+        max-width: min(10rem, 100%);
+    }
+
+    #student-auth-actions {
+        gap: 0.5rem;
     }
 
     #student-profile-display-name {

@@ -48,6 +48,7 @@ if ($status !== '') {
     if ($status === 'Granted' && $user['role'] === 'warden') {
         $where[] = 'lr.status IN (?, ?, ?)';
         array_push($params, 'Granted', 'CHECKED_OUT', 'CHECKED_IN');
+        $where[] = 'lr.end_date >= CURRENT_DATE';
     } else {
         $where[] = 'lr.status = ?';
         $params[] = $status;

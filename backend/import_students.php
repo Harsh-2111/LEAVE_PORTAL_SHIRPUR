@@ -138,7 +138,10 @@ $courseMap = [
 
 while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
     $lineNumber++;
-    if (count($row) === 1 && trim((string)$row[0]) === '') {
+    if (count(array_filter(
+        $row,
+        static fn($value): bool => trim((string)$value) !== ''
+    )) === 0) {
         continue;
     }
     $dataRowCount++;

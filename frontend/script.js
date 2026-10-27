@@ -1177,7 +1177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const statusCell = document.createElement('td');
-        statusCell.className = 'whitespace-nowrap px-3 py-2';
+        statusCell.className = 'px-3 py-2 align-top';
         const status = item.live_status || item.return_timing_status || 'PENDING_EXIT';
         const badge = document.createElement('span');
         badge.className = `gate-status-badge ${gateAttendanceBadgeClass(status)}`;
