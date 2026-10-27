@@ -25,8 +25,6 @@ For an existing database, also apply the gate-attendance indexes to speed up dat
 Get-Content -Raw .\database\migration_gate_attendance_indexes_mysql.sql | docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" hostel_leave'
 ```
 
-For faster student leave-history and Warden approved-history lookups, run `database/migration_leave_history_performance_postgres.sql` in Supabase SQL Editor (or `database/migration_leave_history_performance_mysql.sql` for MySQL).
-
 The importer updates roster records only; it no longer creates or resets student passwords. Existing temporary-password accounts can be claimed through signup after the student's SAP ID, either parent contact number, and official email are matched. If you already ran the previous activation migration, leave its unused student email column and token table in place; do not rerun or manually drop them.
 
 ## Roster import

@@ -67,47 +67,6 @@ document.addEventListener('DOMContentLoaded', () => {
     })[character]);
   }
 
-  function buildTwelveHourTimeInputs(prefix) {
-    const hourOptions = Array.from({ length: 12 }, (_, index) => {
-      const hour = String(index + 1).padStart(2, '0');
-      return `<option value="${hour}">${hour}</option>`;
-    }).join('');
-    const minuteOptions = Array.from({ length: 60 }, (_, minute) => {
-      const value = String(minute).padStart(2, '0');
-      return `<option value="${value}">${value}</option>`;
-    }).join('');
-
-    return `<div class="mt-2 grid grid-cols-3 gap-2">
-      <select id="student-leave-${prefix}-hour" required aria-label="Hour" class="w-full p-3 border border-gray-300 rounded-lg">
-        <option value="">Hour</option>${hourOptions}
-      </select>
-      <select id="student-leave-${prefix}-minute" required aria-label="Minute" class="w-full p-3 border border-gray-300 rounded-lg">
-        <option value="">Min</option>${minuteOptions}
-      </select>
-      <select id="student-leave-${prefix}-period" required aria-label="AM or PM" class="w-full p-3 border border-gray-300 rounded-lg">
-        <option value="">AM/PM</option><option value="AM">AM</option><option value="PM">PM</option>
-      </select>
-    </div>`;
-  }
-
-  function getTwentyFourHourTime(prefix) {
-    const hour = document.getElementById(`student-leave-${prefix}-hour`).value;
-    const minute = document.getElementById(`student-leave-${prefix}-minute`).value;
-    const period = document.getElementById(`student-leave-${prefix}-period`).value;
-    if (!hour || !minute || !period) return '';
-
-    const hour24 = (Number(hour) % 12) + (period === 'PM' ? 12 : 0);
-    return `${String(hour24).padStart(2, '0')}:${minute}`;
-  }
-
-  function formatTimeForDisplay(value) {
-    const match = String(value || '').match(/^(\d{1,2}):(\d{2})/);
-    if (!match) return String(value || '');
-    const hour = Number(match[1]);
-    if (hour < 0 || hour > 23) return String(value);
-    return `${hour % 12 || 12}:${match[2]} ${hour < 12 ? 'AM' : 'PM'}`;
-  }
-
   function openChangePasswordModal() {
     if (!changePasswordModal) return;
     const form = document.getElementById('change-password-form');
@@ -654,13 +613,13 @@ document.addEventListener('DOMContentLoaded', () => {
               <input id="student-leave-start" type="date" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg" />
             </label>
             <label class="block text-sm font-medium text-gray-700">Leave from time
-              ${buildTwelveHourTimeInputs('start')}
+              <input id="student-leave-start-time" type="time" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg" />
             </label>
             <label class="block text-sm font-medium text-gray-700">Return date
               <input id="student-leave-end" type="date" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg" />
             </label>
             <label class="block text-sm font-medium text-gray-700">Return time
-              ${buildTwelveHourTimeInputs('end')}
+              <input id="student-leave-end-time" type="time" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg" />
             </label>
             <p id="student-leave-days" class="md:col-span-2 text-sm text-gray-600" aria-live="polite">Select both dates to see the number of leave days.</p>
             <label class="block text-sm font-medium text-gray-700 md:col-span-2">Home address
@@ -696,6 +655,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const hostelSelect = document.getElementById('student-hostel');
     const startInput = document.getElementById('student-leave-start');
     const endInput = document.getElementById('student-leave-end');
+    const startTimeInput = document.getElementById('student-leave-start-time');
+    const endTimeInput = document.getElementById('student-leave-end-time');
     const studentContactInput = document.getElementById('student-profile-contact');
     const submitButton = document.getElementById('student-submit-leave');
     const profileDisplayName = document.getElementById('student-profile-display-name');
@@ -801,9 +762,7 @@ document.addEventListener('DOMContentLoaded', () => {
         message.className = 'text-sm text-red-600';
         return;
       }
-      const startTime = getTwentyFourHourTime('start');
-      const endTime = getTwentyFourHourTime('end');
-      if (endInput.value < startInput.value || (endInput.value === startInput.value && endTime <= startTime)) {
+      if (endInput.value < startInput.value || (endInput.value === startInput.value && endTimeInput.value <= startTimeInput.value)) {
         message.textContent = 'Return date and time must be after the leave start date and time.';
         message.className = 'text-sm text-red-600';
         return;
@@ -813,9 +772,9 @@ document.addEventListener('DOMContentLoaded', () => {
         sap_id: sapInput.value,
         student_contact: studentContactInput.value,
         start_date: startInput.value,
-        start_time: startTime,
+        start_time: startTimeInput.value,
         end_date: endInput.value,
-        end_time: endTime,
+        end_time: endTimeInput.value,
         home_address: document.getElementById('student-home-address').value.trim(),
         reason: document.getElementById('student-leave-reason').value.trim(),
         school: schoolSelect.value,
@@ -929,7 +888,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </tr></thead>
             <tbody>${items.map(item => `
               <tr class="border-b border-gray-200 hover:bg-gray-100">
-                <td class="py-3 px-4">${item.start_date} ${formatTimeForDisplay(item.start_time)}</td><td class="py-3 px-4">${item.end_date} ${formatTimeForDisplay(item.end_time)}</td><td class="py-3 px-4">${item.room_no || '-'}</td><td class="py-3 px-4">${escapeHtml(item.home_address || '-')}</td>
+                <td class="py-3 px-4">${item.start_date} ${item.start_time || ''}</td><td class="py-3 px-4">${item.end_date} ${item.end_time || ''}</td><td class="py-3 px-4">${item.room_no || '-'}</td><td class="py-3 px-4">${escapeHtml(item.home_address || '-')}</td>
                 <td class="py-3 px-4">${item.leave_days}</td><td class="py-3 px-4">${item.school || '-'} / ${item.hostel || '-'}</td>
                 <td class="py-3 px-4">${item.reason}</td><td class="py-3 px-4">${item.status}</td>
                 <td class="py-3 px-4">${['Granted', 'CHECKED_OUT'].includes(item.status) && item.qr_code_data ? `<button type="button" class="bg-blue-600 text-white px-3 py-1 rounded" data-qrcode="${item.id}">View</button>` : '-'}</td>
@@ -963,7 +922,7 @@ document.addEventListener('DOMContentLoaded', () => {
     target.innerHTML = `
       ${returnInstructions}
       <p class="text-green-800 font-semibold">Pass token: ${pass.pass_token || 'Not available'}</p>
-      <p class="text-sm text-gray-700 mb-4">Valid ${pass.start_date} ${formatTimeForDisplay(pass.start_time)} to ${pass.end_date} ${formatTimeForDisplay(pass.end_time)}</p>
+      <p class="text-sm text-gray-700 mb-4">Valid ${pass.start_date} ${pass.start_time || ''} to ${pass.end_date} ${pass.end_time || ''}</p>
       <div class="gate-pass-qr-card flex justify-center mb-4"><div id="gate-pass-qr" role="img" aria-label="Gate pass QR code"></div></div>
       <div class="flex flex-wrap gap-3">
         <button type="button" id="download-gate-pass-qr" class="bg-blue-600 text-white px-4 py-2 rounded">Download QR</button>
@@ -1285,7 +1244,7 @@ document.addEventListener('DOMContentLoaded', () => {
           [`${item.name || ''} (${item.sap_id || ''})`, 'font-semibold'],
           [`${item.course || ''} | ${item.year || ''} | ${item.gender || ''}`, ''],
           [`Room: ${item.room_no || '-'}`, ''],
-          [`Dates: ${item.start_date} ${formatTimeForDisplay(item.start_time)} to ${item.end_date} ${formatTimeForDisplay(item.end_time)} (${item.leave_days} days)`, ''],
+          [`Dates: ${item.start_date} ${item.start_time || ''} to ${item.end_date} ${item.end_time || ''} (${item.leave_days} days)`, ''],
           [`School / Hostel: ${item.school || '-'} / ${item.hostel || '-'}`, ''],
           [`Student mobile: ${item.student_contact || 'Not provided'}`, ''],
           [`Home address: ${item.home_address || 'Not provided'}`, ''],
@@ -1592,7 +1551,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const values = {
           sap_id: item.sap_id,
           name: item.name,
-          dates: `${item.start_date} ${formatTimeForDisplay(item.start_time)} to ${item.end_date} ${formatTimeForDisplay(item.end_time)}`,
+          dates: `${item.start_date} ${item.start_time || ''} to ${item.end_date} ${item.end_time || ''}`,
           leave_days: item.leave_days,
           location: `${item.school || '-'} / ${item.hostel || '-'}`,
           reason: item.reason,
