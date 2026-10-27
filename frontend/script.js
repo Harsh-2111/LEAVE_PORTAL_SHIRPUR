@@ -114,6 +114,16 @@ document.addEventListener('DOMContentLoaded', () => {
     signupModal.classList.add('hidden');
   }
 
+  function redirectRegisteredStudentToLogin(sapId, message) {
+    closeSignupModal();
+    roleSelect.value = 'student';
+    updateRoleTitle();
+    document.getElementById('user-id').value = sapId;
+    document.getElementById('password').value = '';
+    document.getElementById('password').focus();
+    showMessage(loginMessage, message, 'text-blue-700 bg-blue-50');
+  }
+
   async function handleSignupVerification(event) {
     event.preventDefault();
     const button = document.getElementById('verify-signup-button');
@@ -129,6 +139,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const response = await fetch('/api/index.php?endpoint=signup.php', { method: 'POST', body: formData });
       const result = await response.json();
       if (!response.ok || !result.success) {
+        if (result.account_exists) {
+          redirectRegisteredStudentToLogin(
+            document.getElementById('signup-sap-id').value.trim(),
+            result.message || 'This account is already registered. Please log in instead.'
+          );
+          return;
+        }
         showMessage(message, result.message || 'Account details could not be verified.', 'text-red-700 bg-red-50');
         return;
       }
@@ -173,6 +190,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const response = await fetch('/api/index.php?endpoint=signup.php', { method: 'POST', body: formData });
       const result = await response.json();
       if (!response.ok || !result.success) {
+        if (result.account_exists) {
+          redirectRegisteredStudentToLogin(
+            document.getElementById('signup-sap-id').value.trim(),
+            result.message || 'This account is already registered. Please log in instead.'
+          );
+          return;
+        }
         showMessage(message, result.message || 'Account could not be created.', 'text-red-700 bg-red-50');
         return;
       }

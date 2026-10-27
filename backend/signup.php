@@ -114,7 +114,16 @@ if ($action === 'verify') {
         || !databaseBool($account['must_change_password'])
     )) {
         http_response_code(409);
-        echo json_encode(['success' => false, 'message' => 'This student account is already set up. Sign in or use Forgot password.']);
+        $isRegisteredStudent = $account['role'] === 'student'
+            && databaseBool($account['is_active'])
+            && !databaseBool($account['must_change_password']);
+        echo json_encode([
+            'success' => false,
+            'account_exists' => $isRegisteredStudent,
+            'message' => $isRegisteredStudent
+                ? 'This account is already registered. Please log in instead. If you forgot your password, use Forgot password.'
+                : 'This account cannot be registered. Contact the administrator for help.',
+        ]);
         exit;
     }
 
@@ -196,7 +205,16 @@ if ($action === 'create') {
                 $pdo->rollBack();
                 unset($_SESSION['student_signup_grant']);
                 http_response_code(409);
-                echo json_encode(['success' => false, 'message' => 'This student account is already set up. Sign in or use Forgot password.']);
+                $isRegisteredStudent = $account['role'] === 'student'
+                    && databaseBool($account['is_active'])
+                    && !databaseBool($account['must_change_password']);
+                echo json_encode([
+                    'success' => false,
+                    'account_exists' => $isRegisteredStudent,
+                    'message' => $isRegisteredStudent
+                        ? 'This account is already registered. Please log in instead. If you forgot your password, use Forgot password.'
+                        : 'This account cannot be registered. Contact the administrator for help.',
+                ]);
                 exit;
             }
             $update = $pdo->prepare(
