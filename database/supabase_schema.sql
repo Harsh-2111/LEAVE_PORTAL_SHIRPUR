@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.students (
   parent_name VARCHAR(150),
   parent_email VARCHAR(255),
   parent_contact VARCHAR(20),
+  mother_contact VARCHAR(20),
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

@@ -1,1 +1,1 @@
-sap_id,name,gender,course,year,branch,parent_email,parent_contact
+sap_id,name,gender,course,year,branch,official_email_id,father_contact,mother_contact

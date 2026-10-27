@@ -17,23 +17,25 @@ For four-hostel warden separation, run `database/migration_warden_hostel_scope_p
 
 If Warden 1 or 2 is still labeled as a girls' warden, run `database/migration_warden_gender_labels_postgres.sql` in Supabase SQL Editor (or `database/migration_warden_gender_labels_mysql.sql` for MySQL), then have all four wardens sign out and back in. Wardens 1 and 2 are boys' wardens; Wardens 3 and 4 are girls' wardens.
 
+For student signup to verify either parent's phone number, run `database/migration_student_parent_contacts_postgres.sql` in Supabase SQL Editor (or `database/migration_student_parent_contacts_mysql.sql` for MySQL) before deploying. It adds the optional mother-contact field while keeping existing parent-contact data.
+
 For an existing database, also apply the gate-attendance indexes to speed up date-specific reports and attendance filters. These index migrations assume the gate timestamp columns already exist; if not, run the existing gate attendance migration first. In Supabase, run `database/migration_gate_attendance_indexes_postgres.sql` in SQL Editor. For MySQL, run this from the project directory:
 
 ```powershell
 Get-Content -Raw .\database\migration_gate_attendance_indexes_mysql.sql | docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" hostel_leave'
 ```
 
-No additional database migration is required for student self-signup. The importer updates roster records only; it no longer creates or resets student passwords. Existing temporary-password accounts can be claimed through signup after the student's SAP ID and parent contact details are matched. If you already ran the previous activation migration, leave its unused student email column and token table in place; do not rerun or manually drop them.
+The importer updates roster records only; it no longer creates or resets student passwords. Existing temporary-password accounts can be claimed through signup after the student's SAP ID, either parent contact number, and official email are matched. If you already ran the previous activation migration, leave its unused student email column and token table in place; do not rerun or manually drop them.
 
 ## Roster import
 
-The Admin importer accepts UTF-8 CSV only (not `.xlsx`), up to 2,500 data rows and 2 MB per upload. In Excel, use **Save As → CSV UTF-8**. Check that SAP IDs and parent phone numbers remain intact; format these columns as text if Excel removes leading zeroes. Use the header row from `frontend/student_roster_template.csv`. Student phone, batch, and room number are optional and can be omitted.
+The Admin importer accepts UTF-8 CSV only (not `.xlsx`), up to 2,500 data rows and 2 MB per upload. In Excel, use **Save As → CSV UTF-8**. Check that SAP IDs and parent phone numbers remain intact; format these columns as text if Excel removes leading zeroes. Use the header row from `frontend/student_roster_template.csv`, including the official email ID, father contact, and mother contact columns. At least one parent contact is required; students can verify using either number. Student phone, batch, and room number are optional and can be omitted.
 
 Valid records are committed in one transaction. Invalid rows are skipped and reported by CSV row number. A normal roster re-import updates profiles without changing existing student passwords. A SAP ID already used by a staff account is rejected instead of changing that account's role.
 
-The importer validates each row, reports missing or invalid details, and updates student records without touching account passwords. Students select **Sign Up** on the student login page, provide their SAP ID plus the parent contact and email recorded in the roster, then create and confirm a password of at least 8 characters. Setup verification expires after 10 minutes and repeated failed identity checks lock signup for three hours. Existing accounts created by the earlier importer can use signup once to replace their temporary password; accounts with an already-set password should sign in or use **Forgot password** instead.
+The importer validates each row, reports missing or invalid details, and updates student records without touching account passwords. It accepts `Secondary E-Mail ID` as the official email and `Father Mobile No.` / `Mother Mobile No.` as the two parent contacts from the source roster, as well as the normalized template headers. Students select **Sign Up** on the student login page, provide their SAP ID, either parent contact, and the official email recorded in the roster, then create and confirm a password of at least 8 characters. Password recovery accepts either parent contact too. Setup verification expires after 10 minutes and repeated failed identity checks lock signup for three hours. Existing accounts created by the earlier importer can use signup once to replace their temporary password; accounts with an already-set password should sign in or use **Forgot password** instead.
 
-The parent contact and email check is a roster match, not a one-time verification code. Treat the student roster as confidential and only import records that the college has authorized the portal to use. Test first with a few authorized test accounts.
+The parent contact and official email check is a roster match, not a one-time verification code. Treat the student roster as confidential and only import records that the college has authorized the portal to use. Test first with a few authorized test accounts.
 
 ## Capacity and operations
 

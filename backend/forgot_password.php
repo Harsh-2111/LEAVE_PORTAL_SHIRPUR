@@ -55,7 +55,7 @@ if ($action === 'verify') {
     }
 
     $studentStmt = $pdo->prepare(
-        'SELECT u.id, s.sap_id, s.student_contact, s.parent_contact, s.parent_email '
+        'SELECT u.id, s.sap_id, s.student_contact, s.parent_contact, s.mother_contact, s.parent_email '
         . 'FROM students s INNER JOIN users u ON u.login_id = s.sap_id '
         . 'WHERE s.sap_id = ? AND s.is_active = TRUE AND u.role = ? AND u.is_active = TRUE LIMIT 1'
     );
@@ -65,6 +65,7 @@ if ($action === 'verify') {
         ? [
             preg_replace('/\D+/', '', (string)$student['student_contact']),
             preg_replace('/\D+/', '', (string)$student['parent_contact']),
+            preg_replace('/\D+/', '', (string)$student['mother_contact']),
         ]
         : [];
     $matches = $student

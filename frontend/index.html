@@ -348,10 +348,10 @@
                 <label class="block text-sm font-medium text-gray-700">SAP ID
                     <input id="forgot-sap-id" type="text" inputmode="numeric" autocomplete="username" maxlength="11" minlength="11" required class="mt-1 w-full p-3 border border-gray-300 rounded-lg" placeholder="11-digit SAP ID">
                 </label>
-                <label class="block text-sm font-medium text-gray-700">Registered student or parent contact number
+                <label class="block text-sm font-medium text-gray-700">Student mobile or either parent contact number
                     <input id="forgot-contact" type="tel" inputmode="tel" autocomplete="tel" required class="mt-1 w-full p-3 border border-gray-300 rounded-lg" placeholder="Contact number on record">
                 </label>
-                <label class="block text-sm font-medium text-gray-700">Email on the student record
+                <label class="block text-sm font-medium text-gray-700">Official email ID on the student record
                     <input id="forgot-email" type="email" autocomplete="email" required class="mt-1 w-full p-3 border border-gray-300 rounded-lg" placeholder="Email on record">
                 </label>
                 <div id="forgot-password-identity-message" class="hidden rounded-lg p-3 text-sm" aria-live="polite"></div>
@@ -388,17 +388,17 @@
                 <h2 class="text-xl font-semibold text-gray-800">Create student account</h2>
                 <button type="button" id="close-signup-modal" class="text-gray-500 hover:text-gray-700 text-2xl leading-none" aria-label="Close">×</button>
             </div>
-            <p class="mb-4 text-sm text-gray-600">Verify your SAP ID using the parent contact details in the student record, then create your password.</p>
+            <p class="mb-4 text-sm text-gray-600">Verify your SAP ID using either parent contact number and the student's official email ID on record, then create your password.</p>
 
             <form id="signup-identity-form" class="space-y-4">
                 <label class="block text-sm font-medium text-gray-700">SAP ID
                     <input id="signup-sap-id" type="text" inputmode="numeric" autocomplete="username" maxlength="11" minlength="11" required class="mt-1 w-full p-3 border border-gray-300 rounded-lg" placeholder="11-digit SAP ID">
                 </label>
-                <label class="block text-sm font-medium text-gray-700">Parent contact number
-                    <input id="signup-parent-contact" type="tel" inputmode="tel" autocomplete="tel" required class="mt-1 w-full p-3 border border-gray-300 rounded-lg" placeholder="Parent contact on record">
+                <label class="block text-sm font-medium text-gray-700">Father's or mother's contact number
+                    <input id="signup-parent-contact" type="tel" inputmode="tel" autocomplete="tel" required class="mt-1 w-full p-3 border border-gray-300 rounded-lg" placeholder="Enter either parent number on record">
                 </label>
-                <label class="block text-sm font-medium text-gray-700">Parent email
-                    <input id="signup-parent-email" type="email" autocomplete="email" required class="mt-1 w-full p-3 border border-gray-300 rounded-lg" placeholder="Parent email on record">
+                <label class="block text-sm font-medium text-gray-700">Official email ID
+                    <input id="signup-parent-email" type="email" autocomplete="email" required class="mt-1 w-full p-3 border border-gray-300 rounded-lg" placeholder="Official email ID listed in your student record">
                 </label>
                 <div id="signup-identity-message" class="hidden rounded-lg p-3 text-sm" aria-live="polite"></div>
                 <button id="verify-signup-button" type="submit" class="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700">Verify details</button>

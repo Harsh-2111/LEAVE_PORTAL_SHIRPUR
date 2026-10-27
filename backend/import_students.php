@@ -54,8 +54,9 @@ $columnMap = [
     'hostel_block' => ['hostel_block', 'block', 'hostel block'],
     'room_no' => ['room_no', 'room', 'room number'],
     'parent_name' => ['parent_name', 'father_name', 'guardian_name'],
-    'parent_email' => ['parent_email', 'guardian_email', 'email', 'father e mail', 'father email'],
-    'parent_contact' => ['parent_contact', 'parent_phone', 'guardian_phone', 'contact_number', 'father mobile no', 'father mobile number'],
+    'parent_email' => ['secondary e mail id', 'secondary email id', 'secondary_email_id', 'official email id', 'official_email_id', 'official mail id', 'official_mail_id', 'parent_email', 'guardian_email', 'email'],
+    'parent_contact' => ['father_contact', 'father mobile no', 'father mobile number', 'father phone', 'parent_contact', 'parent_phone', 'guardian_phone', 'contact_number'],
+    'mother_contact' => ['mother_contact', 'mother mobile no', 'mother mobile number', 'mother phone'],
 ];
 $normalize = static function (string $value): string {
     $value = strtolower(trim($value));
@@ -94,10 +95,13 @@ foreach ($columnMap as $field => $aliases) {
 }
 
 $missingColumns = [];
-foreach (['sap_id', 'name', 'gender', 'course', 'year', 'branch', 'parent_email', 'parent_contact'] as $requiredField) {
+foreach (['sap_id', 'name', 'gender', 'course', 'year', 'branch', 'parent_email'] as $requiredField) {
     if (!isset($resolvedColumns[$requiredField])) {
         $missingColumns[] = $requiredField;
     }
+}
+if (!isset($resolvedColumns['parent_contact']) && !isset($resolvedColumns['mother_contact'])) {
+    $missingColumns[] = 'father_contact or mother_contact';
 }
 if ($missingColumns !== []) {
     fclose($handle);
@@ -167,7 +171,9 @@ while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
     $courseInput = (string)preg_replace('/[^a-z]/', '', strtolower($record['course'] ?? ''));
     $course = $courseMap[$courseInput] ?? '';
     $parentEmail = $record['parent_email'] ?? '';
-    $parentContact = $record['parent_contact'] ?? '';
+    $fatherContact = $record['parent_contact'] ?? '';
+    $motherContact = $record['mother_contact'] ?? '';
+    $parentContact = $fatherContact !== '' ? $fatherContact : $motherContact;
     $parentName = $record['parent_name'] ?? '';
     $hostelBlock = $record['hostel_block'] ?? '';
     $hasOversizedField = strlen($studentName) > 150
@@ -188,9 +194,11 @@ while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
     if (
         !filter_var($parentEmail, FILTER_VALIDATE_EMAIL)
         || ($studentContact !== '' && !preg_match('/^[0-9+() -]{7,20}$/', $studentContact))
-        || !preg_match('/^[0-9+() -]{7,20}$/', $parentContact)
+        || ($fatherContact !== '' && !preg_match('/^[0-9+() -]{7,20}$/', $fatherContact))
+        || ($motherContact !== '' && !preg_match('/^[0-9+() -]{7,20}$/', $motherContact))
+        || ($fatherContact === '' && $motherContact === '')
     ) {
-        $addError($lineNumber, $sapId, 'Student phone, parent email, or parent contact is invalid.');
+        $addError($lineNumber, $sapId, 'Student phone or official email is invalid, or neither parent contact is valid.');
         continue;
     }
     $seenSapIds[$sapId] = true;
@@ -208,6 +216,7 @@ while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
         'parent_name' => $parentName,
         'parent_email' => $parentEmail,
         'parent_contact' => $parentContact,
+        'mother_contact' => $motherContact === '' ? null : $motherContact,
     ];
 }
 fclose($handle);
@@ -256,16 +265,16 @@ if ($records === []) {
 $chunkSize = 100;
 $studentColumns = [
     'sap_id', 'name', 'student_contact', 'gender', 'course', 'year', 'branch', 'batch',
-    'hostel_block', 'parent_name', 'parent_email', 'parent_contact',
+    'hostel_block', 'parent_name', 'parent_email', 'parent_contact', 'mother_contact',
 ];
 $studentPlaceholders = '(' . implode(', ', array_fill(0, count($studentColumns), '?'))
     . ', ' . (DB_DRIVER === 'pgsql' ? 'TRUE' : '1') . ', NOW())';
 $studentUpdate = implode(', ', array_map(
     static function (string $column): string {
-        if ($column === 'student_contact') {
+        if ($column === 'student_contact' || $column === 'mother_contact') {
             return DB_DRIVER === 'pgsql'
-                ? 'student_contact = COALESCE(EXCLUDED.student_contact, students.student_contact)'
-                : 'student_contact = COALESCE(VALUES(student_contact), student_contact)';
+                ? $column . ' = COALESCE(EXCLUDED.' . $column . ', students.' . $column . ')'
+                : $column . ' = COALESCE(VALUES(' . $column . '), ' . $column . ')';
         }
         return $column . ' = ' . (DB_DRIVER === 'pgsql' ? 'EXCLUDED.' . $column : 'VALUES(' . $column . ')');
     },

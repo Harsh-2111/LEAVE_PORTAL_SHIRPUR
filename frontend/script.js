@@ -1999,7 +1999,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <section class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
           <h2 class="text-2xl font-semibold text-gray-700 mb-4">Import Students CSV</h2>
           <p class="text-sm text-gray-600 mb-3"><a href="/frontend/student_roster_template.csv" class="text-blue-600 underline">Student CSV template</a>. Save as UTF-8 CSV from Excel; XLSX files are not accepted. Maximum 2,500 rows and 2 MB. Student phone, batch, and room number are not required in the roster.</p>
-          <p class="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">This imports or updates student records only; it does not create passwords. Students create their own account from the sign-in page using the SAP ID and matching parent contact details in this roster.</p>
+          <p class="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">This imports or updates student records only; it does not create passwords. Students create their own account using their SAP ID, either parent contact number, and matching official email ID from this roster.</p>
           <form id="student-import-form" enctype="multipart/form-data">
             <input type="file" name="students_csv" accept=".csv,text/csv" required class="block w-full text-sm text-gray-500" />
             <button type="submit" class="mt-4 bg-green-600 text-white px-5 py-3 rounded-lg font-semibold disabled:cursor-wait disabled:opacity-60">Import Students</button>

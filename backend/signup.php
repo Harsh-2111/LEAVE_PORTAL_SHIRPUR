@@ -65,15 +65,25 @@ if ($action === 'verify') {
     }
 
     $studentStmt = $pdo->prepare(
-        'SELECT sap_id, parent_contact, parent_email FROM students WHERE sap_id = ? AND is_active = TRUE LIMIT 1'
+        'SELECT sap_id, parent_contact, mother_contact, parent_email FROM students WHERE sap_id = ? AND is_active = TRUE LIMIT 1'
     );
     $studentStmt->execute([$sapId]);
     $student = $studentStmt->fetch();
-    $matches = $student
-        && hash_equals(
+    $registeredContacts = $student
+        ? [
             preg_replace('/\D+/', '', (string)$student['parent_contact']),
-            $contact
-        )
+            preg_replace('/\D+/', '', (string)$student['mother_contact']),
+        ]
+        : [];
+    $matchesContact = false;
+    foreach ($registeredContacts as $registeredContact) {
+        if ($registeredContact !== '' && hash_equals($registeredContact, $contact)) {
+            $matchesContact = true;
+            break;
+        }
+    }
+    $matches = $student
+        && $matchesContact
         && hash_equals(
             strtolower(trim((string)$student['parent_email'])),
             $email
