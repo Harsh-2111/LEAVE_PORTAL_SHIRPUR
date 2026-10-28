@@ -703,7 +703,7 @@ document.addEventListener('DOMContentLoaded', () => {
               </span>
               <span id="student-contact-help" class="mt-1 block text-xs text-gray-500">Enter exactly 10 digits. The +91 country code is fixed.</span>
             </label>
-            <label class="block text-sm font-medium text-gray-700">Parent email
+            <label class="block text-sm font-medium text-gray-700">Father's email on record
               <input id="student-profile-parent-email" type="email" readonly required class="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-100" />
             </label>
             <label class="block text-sm font-medium text-gray-700">Parent contact number
@@ -2421,13 +2421,13 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <section class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
           <h2 class="text-2xl font-semibold text-gray-700 mb-4">Import Students CSV</h2>
-          <p class="text-sm text-gray-600 mb-3"><a href="/frontend/student_roster_template.csv" class="text-blue-600 underline">Student CSV template</a>. Save as UTF-8 CSV from Excel; XLSX files are not accepted. Maximum 2,500 rows and 2 MB. Student phone, batch, and room number are not required in the roster.</p>
-          <p class="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">This imports or updates student records only; it does not create passwords. Students create their own account using their SAP ID, either parent contact number, and matching official email ID from this roster.</p>
+          <p class="text-sm text-gray-600 mb-3">Upload a UTF-8 CSV; XLSX files are not accepted. Maximum 2,500 rows and 2 MB. Student phone, batch, and room number are not required in the roster.</p>
+          <p class="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">Use the father's email from the original roster's “Father E Mail” column as <strong>father_email</strong>. The generated <strong>official_email_id</strong> is the student's email, not the father's; it cannot be used for parent verification. Add the father_email column to your CSV before importing. “Father E Mail” and “father_email” headers are accepted. This imports student records only and does not create passwords; signup uses the SAP ID, either parent contact number, and the father's email on record.</p>
           <form id="student-import-form" enctype="multipart/form-data">
             <input type="file" name="students_csv" accept=".csv,text/csv" required class="block w-full text-sm text-gray-500" />
             <label class="mt-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
               <input id="reset-student-accounts" type="checkbox" name="reset_student_accounts" value="1" class="mt-1 h-4 w-4 accent-amber-600" />
-              <span><strong>Require students in this CSV to sign up again.</strong> Their existing passwords will stop working and they must verify their SAP ID, either parent contact, and official email before creating a new password. Student profiles and leave history are preserved. This applies only to valid student rows in this upload.</span>
+              <span><strong>Require students in this CSV to sign up again.</strong> Their existing passwords will stop working and they must verify their SAP ID, either parent contact, and father's email before creating a new password. Student profiles and leave history are preserved. This applies only to valid student rows in this upload.</span>
             </label>
             <button type="submit" class="mt-4 bg-green-600 text-white px-5 py-3 rounded-lg font-semibold disabled:cursor-wait disabled:opacity-60">Import Students</button>
           </form>

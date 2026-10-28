@@ -54,7 +54,7 @@ $columnMap = [
     'hostel_block' => ['hostel_block', 'block', 'hostel block'],
     'room_no' => ['room_no', 'room', 'room number'],
     'parent_name' => ['parent_name', 'father_name', 'guardian_name'],
-    'parent_email' => ['secondary e mail id', 'secondary email id', 'secondary_email_id', 'official email id', 'official_email_id', 'official mail id', 'official_mail_id', 'parent_email', 'guardian_email', 'email'],
+    'parent_email' => ['father_email', 'father_e_mail', 'father email id', 'father e mail id', 'father_e_mail_id', 'parent_email', 'parent e mail', 'guardian_email'],
     'parent_contact' => ['father_contact', 'father mobile no', 'father mobile number', 'father phone', 'parent_contact', 'parent_phone', 'guardian_phone', 'contact_number'],
     'mother_contact' => ['mother_contact', 'mother mobile no', 'mother mobile number', 'mother phone'],
 ];
@@ -95,10 +95,13 @@ foreach ($columnMap as $field => $aliases) {
 }
 
 $missingColumns = [];
-foreach (['sap_id', 'name', 'gender', 'course', 'year', 'branch', 'parent_email'] as $requiredField) {
+foreach (['sap_id', 'name', 'gender', 'course', 'year', 'branch'] as $requiredField) {
     if (!isset($resolvedColumns[$requiredField])) {
         $missingColumns[] = $requiredField;
     }
+}
+if (!isset($resolvedColumns['parent_email'])) {
+    $missingColumns[] = 'father_email (Father E Mail from the original roster; official_email_id is the student email)';
 }
 if (!isset($resolvedColumns['parent_contact']) && !isset($resolvedColumns['mother_contact'])) {
     $missingColumns[] = 'father_contact or mother_contact';
@@ -208,7 +211,7 @@ while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
         || ($motherContact !== '' && !preg_match('/^[0-9+() -]{7,20}$/', $motherContact))
         || ($fatherContact === '' && $motherContact === '')
     ) {
-        $addError($lineNumber, $sapId, 'Student phone or official email is invalid, or neither parent contact is valid.');
+        $addError($lineNumber, $sapId, 'Father email or contact details are invalid. Use the original Father E Mail value, not the student official_email_id.');
         continue;
     }
     $seenSapIds[$sapId] = true;
