@@ -557,7 +557,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <span id="${role}-notification-count" class="notification-count" aria-hidden="true"></span>
       </button>
       <div id="${role}-notification-panel" class="notification-panel hidden">
-        <div class="notification-panel-header"><strong>Notifications</strong><button type="button" id="${role}-notifications-clear">Clear all</button></div>
+        <div class="notification-panel-header"><strong>Notifications</strong><div class="notification-panel-actions"><button type="button" id="${role}-notifications-clear">Clear all</button><button type="button" id="${role}-notifications-close" class="notification-close" aria-label="Close notifications">×</button></div></div>
         <div id="${role}-notification-list" class="notification-list"><p class="notification-empty">Loading notifications...</p></div>
       </div>
     </div>`;
@@ -605,6 +605,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById(`${role}-notifications-clear`).addEventListener('click', async () => {
       await notificationRequest('clear');
       await loadNotifications();
+    });
+    document.getElementById(`${role}-notifications-close`).addEventListener('click', () => {
+      panel.classList.add('hidden');
+      button.setAttribute('aria-expanded', 'false');
     });
     list.addEventListener('click', async event => {
       const item = event.target.closest('.notification-item');
