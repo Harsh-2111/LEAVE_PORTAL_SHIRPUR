@@ -757,6 +757,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </label>
             <label class="block text-sm font-medium text-gray-700">Leave from date
               <input id="student-leave-start" type="date" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg" />
+              <span class="mt-1 block text-xs text-gray-500">Leave start dates can be selected up to 5 days ahead.</span>
             </label>
             <label class="block text-sm font-medium text-gray-700">Leave from time
               <input id="student-leave-start-time" type="time" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg" />
@@ -829,10 +830,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const profileIcon = document.getElementById('student-profile-icon');
     profileDisplayName.textContent = state.user.name || 'Student';
     const now = new Date();
-    const localToday = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-    const today = localToday.toISOString().slice(0, 10);
+    const campusDateParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(now);
+    const campusDate = Object.fromEntries(campusDateParts.map(part => [part.type, part.value]));
+    const today = `${campusDate.year}-${campusDate.month}-${campusDate.day}`;
+    const latestStartDate = new Date(`${today}T00:00:00Z`);
+    latestStartDate.setUTCDate(latestStartDate.getUTCDate() + 5);
+    const latestStartDateValue = latestStartDate.toISOString().slice(0, 10);
     sapInput.value = state.user.login_id;
     startInput.min = today;
+    startInput.max = latestStartDateValue;
     endInput.min = today;
 
     let expectedSchool = '';
@@ -884,16 +895,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const updateLeaveDays = () => {
       const output = document.getElementById('student-leave-days');
       endInput.min = startInput.value || today;
-      if (!startInput.value || !endInput.value) {
+      if (startInput.value > latestStartDateValue) {
+        startInput.setCustomValidity(`Leave start date must be on or before ${latestStartDateValue}.`);
+        output.textContent = `Choose a leave start date on or before ${latestStartDateValue}.`;
+        output.className = 'md:col-span-2 text-sm text-red-600';
+      } else if (!startInput.value || !endInput.value) {
+        startInput.setCustomValidity('');
         output.textContent = 'Select both dates to see the number of leave days.';
         output.className = 'md:col-span-2 text-sm text-gray-600';
       } else if (
         endInput.value < startInput.value
         || (endInput.value === startInput.value && startTimeInput.value && endTimeInput.value && endTimeInput.value <= startTimeInput.value)
       ) {
+        startInput.setCustomValidity('');
         output.textContent = 'Return date and time must be after the leave start date and time.';
         output.className = 'md:col-span-2 text-sm text-red-600';
       } else {
+        startInput.setCustomValidity('');
         const start = new Date(`${startInput.value}T00:00:00Z`);
         const end = new Date(`${endInput.value}T00:00:00Z`);
         const days = Math.round((end - start) / 86400000) + 1;
@@ -919,6 +937,14 @@ document.addEventListener('DOMContentLoaded', () => {
         invalidField.focus();
         invalidField.reportValidity();
         message.textContent = 'Please fill in all required leave request fields.';
+        message.className = 'text-sm text-red-600';
+        return;
+      }
+      if (startInput.value > latestStartDateValue) {
+        startInput.setCustomValidity(`Leave start date must be on or before ${latestStartDateValue}.`);
+        startInput.focus();
+        startInput.reportValidity();
+        message.textContent = `Leave start dates are limited to the next 5 days, through ${latestStartDateValue}.`;
         message.className = 'text-sm text-red-600';
         return;
       }

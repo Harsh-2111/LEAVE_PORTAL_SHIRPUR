@@ -65,6 +65,15 @@ if (
 }
 $startDateTime = DateTimeImmutable::createFromFormat('!Y-m-d H:i', $startDate . ' ' . $startTime, $campusTimezone);
 $endDateTime = DateTimeImmutable::createFromFormat('!Y-m-d H:i', $endDate . ' ' . $endTime, $campusTimezone);
+$latestStartDate = (new DateTimeImmutable('today', $campusTimezone))->modify('+5 days')->format('Y-m-d');
+if ($startDate > $latestStartDate) {
+    http_response_code(400);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Leave start date must be within the next 5 days (through ' . $latestStartDate . ').',
+    ]);
+    exit;
+}
 if (
     !$startDateTime
     || !$endDateTime
