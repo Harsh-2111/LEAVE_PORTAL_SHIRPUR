@@ -554,7 +554,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return `<div class="notification-wrapper relative">
       <button type="button" id="${role}-notifications-button" class="notification-bell" aria-label="Notifications" aria-expanded="false">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
-        <span id="${role}-notification-count" class="notification-count hidden">0</span>
+        <span id="${role}-notification-count" class="notification-count" aria-hidden="true"></span>
       </button>
       <div id="${role}-notification-panel" class="notification-panel hidden">
         <div class="notification-panel-header"><strong>Notifications</strong><button type="button" id="${role}-notifications-clear">Clear all</button></div>
@@ -580,8 +580,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const response = await notificationRequest();
         const result = await response.json();
         const items = result.items || [];
-        badge.textContent = String(result.unread_count || 0);
-        badge.classList.toggle('hidden', !result.unread_count);
+        const unreadCount = Number(result.unread_count || 0);
+        badge.textContent = unreadCount > 0 ? (unreadCount > 99 ? '99+' : String(unreadCount)) : '';
+        badge.classList.toggle('has-unread', unreadCount > 0);
         if (!items.length) {
           list.innerHTML = '<p class="notification-empty">No notifications yet.</p>';
           return;
@@ -622,7 +623,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     await loadNotifications();
     if (window.notificationPollTimer) clearInterval(window.notificationPollTimer);
-    window.notificationPollTimer = setInterval(() => { if (!document.hidden) loadNotifications(); }, 30000);
+    window.notificationPollTimer = setInterval(() => { if (!document.hidden) loadNotifications(); }, 5000);
   }
 
   async function showStudentPage() {

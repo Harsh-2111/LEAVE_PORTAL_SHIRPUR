@@ -39,6 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 $stmt = $pdo->prepare('SELECT id, leave_id, type, title, message, link, read_at, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 50');
 $stmt->execute([(int)$user['id']]);
 $items = $stmt->fetchAll();
-$unread = 0;
-foreach ($items as $item) if ($item['read_at'] === null) $unread++;
+$count = $pdo->prepare('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_at IS NULL');
+$count->execute([(int)$user['id']]);
+$unread = (int)$count->fetchColumn();
 echo json_encode(['success' => true, 'unread_count' => $unread, 'items' => $items]);
