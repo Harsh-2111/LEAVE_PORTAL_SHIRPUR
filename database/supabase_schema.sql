@@ -11,7 +11,6 @@ CREATE TABLE IF NOT EXISTS public.students (
   room_no VARCHAR(50),
   parent_name VARCHAR(150),
   parent_email VARCHAR(255),
-  official_email_id VARCHAR(255),
   parent_contact VARCHAR(20),
   mother_contact VARCHAR(20),
   is_active BOOLEAN NOT NULL DEFAULT TRUE,

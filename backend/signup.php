@@ -31,13 +31,13 @@ if ($action === 'verify') {
 
     $sapId = trim((string)($_POST['sap_id'] ?? ''));
     $contact = trim((string)($_POST['parent_contact'] ?? ''));
-    $officialEmail = strtolower(trim((string)($_POST['official_email_id'] ?? '')));
+    $email = strtolower(trim((string)($_POST['parent_email'] ?? '')));
 
     if (!preg_match('/^\d{11}$/', $sapId)
         || !preg_match('/^\d{10}$/', $contact)
-        || !filter_var($officialEmail, FILTER_VALIDATE_EMAIL)) {
+        || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Enter a valid SAP ID, parent contact number, and official student email address.']);
+        echo json_encode(['success' => false, 'message' => 'Enter a valid SAP ID, parent contact number, and parent email address.']);
         exit;
     }
 
@@ -64,7 +64,7 @@ if ($action === 'verify') {
     }
 
     $studentStmt = $pdo->prepare(
-        'SELECT sap_id, parent_contact, mother_contact, official_email_id FROM students WHERE sap_id = ? AND is_active = TRUE LIMIT 1'
+        'SELECT sap_id, parent_contact, mother_contact, parent_email FROM students WHERE sap_id = ? AND is_active = TRUE LIMIT 1'
     );
     $studentStmt->execute([$sapId]);
     $student = $studentStmt->fetch();
@@ -84,8 +84,8 @@ if ($action === 'verify') {
     $matches = $student
         && $matchesContact
         && hash_equals(
-            strtolower(trim((string)$student['official_email_id'])),
-            $officialEmail
+            strtolower(trim((string)$student['parent_email'])),
+            $email
         );
 
     if (!$matches) {

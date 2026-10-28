@@ -55,7 +55,6 @@ $columnMap = [
     'room_no' => ['room_no', 'room', 'room number'],
     'parent_name' => ['parent_name', 'father_name', 'guardian_name'],
     'parent_email' => ['father_email', 'father_e_mail', 'father email id', 'father e mail id', 'father_e_mail_id', 'parent_email', 'parent e mail', 'guardian_email'],
-    'official_email_id' => ['official_email_id', 'official_email', 'student_email', 'student_email_id'],
     'parent_contact' => ['father_contact', 'father mobile no', 'father mobile number', 'father phone', 'parent_contact', 'parent_phone', 'guardian_phone', 'contact_number'],
     'mother_contact' => ['mother_contact', 'mother mobile no', 'mother mobile number', 'mother phone'],
 ];
@@ -102,10 +101,7 @@ foreach (['sap_id', 'name', 'gender', 'course', 'year', 'branch'] as $requiredFi
     }
 }
 if (!isset($resolvedColumns['parent_email'])) {
-    $missingColumns[] = 'father_email (Father E Mail from the original roster)';
-}
-if (!isset($resolvedColumns['official_email_id'])) {
-    $missingColumns[] = 'official_email_id (the student official email address)';
+    $missingColumns[] = 'father_email (Father E Mail from the original roster; official_email_id is the student email)';
 }
 if (!isset($resolvedColumns['parent_contact']) && !isset($resolvedColumns['mother_contact'])) {
     $missingColumns[] = 'father_contact or mother_contact';
@@ -188,7 +184,6 @@ while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
     $courseInput = (string)preg_replace('/[^a-z]/', '', strtolower($record['course'] ?? ''));
     $course = $courseMap[$courseInput] ?? '';
     $parentEmail = $record['parent_email'] ?? '';
-    $officialEmail = strtolower($record['official_email_id'] ?? '');
     $fatherContact = $record['parent_contact'] ?? '';
     $motherContact = $record['mother_contact'] ?? '';
     $parentContact = $fatherContact !== '' ? $fatherContact : $motherContact;
@@ -199,8 +194,7 @@ while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
         || strlen($batch) > 50
         || strlen($hostelBlock) > 50
         || strlen($parentName) > 150
-        || strlen($parentEmail) > 255
-        || strlen($officialEmail) > 255;
+        || strlen($parentEmail) > 255;
 
     if (
         $studentName === '' || $hasOversizedField || $year === ''
@@ -212,13 +206,12 @@ while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
     }
     if (
         !filter_var($parentEmail, FILTER_VALIDATE_EMAIL)
-        || !filter_var($officialEmail, FILTER_VALIDATE_EMAIL)
         || ($studentContact !== '' && !preg_match('/^[0-9+() -]{7,20}$/', $studentContact))
         || ($fatherContact !== '' && !preg_match('/^[0-9+() -]{7,20}$/', $fatherContact))
         || ($motherContact !== '' && !preg_match('/^[0-9+() -]{7,20}$/', $motherContact))
         || ($fatherContact === '' && $motherContact === '')
     ) {
-        $addError($lineNumber, $sapId, 'Father email, student official email, or contact details are invalid. Keep father_email and official_email_id in their correct columns.');
+        $addError($lineNumber, $sapId, 'Father email or contact details are invalid. Use the original Father E Mail value, not the student official_email_id.');
         continue;
     }
     $seenSapIds[$sapId] = true;
@@ -235,7 +228,6 @@ while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
         'hostel_block' => $hostelBlock,
         'parent_name' => $parentName,
         'parent_email' => $parentEmail,
-        'official_email_id' => $officialEmail,
         'parent_contact' => $parentContact,
         'mother_contact' => $motherContact === '' ? null : $motherContact,
     ];
@@ -292,7 +284,7 @@ if ($records === []) {
 $chunkSize = 100;
 $studentColumns = [
     'sap_id', 'name', 'student_contact', 'gender', 'course', 'year', 'branch', 'batch',
-    'hostel_block', 'parent_name', 'parent_email', 'official_email_id', 'parent_contact', 'mother_contact',
+    'hostel_block', 'parent_name', 'parent_email', 'parent_contact', 'mother_contact',
 ];
 $studentPlaceholders = '(' . implode(', ', array_fill(0, count($studentColumns), '?'))
     . ', ' . (DB_DRIVER === 'pgsql' ? 'TRUE' : '1') . ', NOW())';
