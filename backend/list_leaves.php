@@ -16,6 +16,7 @@ $limit = min(100, max(1, (int)($_GET['limit'] ?? 20)));
 $offset = ($page - 1) * $limit;
 $status = trim((string)($_GET['status'] ?? ''));
 $sapId = trim((string)($_GET['sap_id'] ?? ''));
+$leaveId = max(0, (int)($_GET['leave_id'] ?? 0));
 $search = trim((string)($_GET['search'] ?? ''));
 $startDate = trim((string)($_GET['start_date'] ?? ''));
 $endDate = trim((string)($_GET['end_date'] ?? ''));
@@ -42,6 +43,11 @@ if ($user['role'] === 'warden') {
 if ($sapId !== '') {
     $where[] = 'lr.sap_id = ?';
     $params[] = $sapId;
+}
+
+if ($leaveId > 0) {
+    $where[] = 'lr.id = ?';
+    $params[] = $leaveId;
 }
 
 if ($status !== '') {

@@ -78,7 +78,11 @@ Do not use the direct database host if it is unreachable from Vercel, and do not
 
 For an existing Supabase deployment, run `database/migration_portal_features_postgres.sql` once in the Supabase SQL Editor before using emergency-contact fields, leave-policy configuration, or announcements. The migration is additive and preserves existing requests. Leave policies are unrestricted until an administrator configures a limit. The migration has a MySQL counterpart for existing local MySQL databases.
 
-Students can cancel their own pending or approved leave requests before gate exit. Admins can view audit history, manage announcements, and configure optional hostel policies. Students and wardens can view announcements and a read-only leave calendar. Overdue-return notifications are generated when a relevant student or warden portal checks notifications; no external email or SMS service is used.
+Students can cancel their own pending or approved leave requests before gate exit. Admins can manage announcements and configure optional hostel policies. Students and wardens can view announcements and a read-only leave calendar. The admin audit-history screen has been removed; internal audit records remain in use by gate and security workflows.
+
+Wardens receive notifications only for leave requests assigned to their hostel group. Notifications include the student's name, SAP ID, year, hostel block, and room when available. Selecting a new-leave notification opens that exact pending request for review. Notification updates are polled while the portal is visible; overdue-return notices are generated when a relevant student or warden checks notifications. No external email or SMS service is used.
+
+The warden's Approved Leave History section also provides current-week (Monday through Sunday) and current-calendar-month CSV reports. Reports include approved leave details, scheduled dates, gate exit and entry times, return timing, and the security staff recorded for gate scans.
 
 ## Demo accounts
 

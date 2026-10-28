@@ -578,11 +578,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!button || !panel) return;
     const badge = document.getElementById(`${role}-notification-count`);
     const list = document.getElementById(`${role}-notification-list`);
+    let loadingNotifications = false;
 
     async function loadNotifications() {
+      if (loadingNotifications || document.hidden) return;
+      loadingNotifications = true;
       try {
         const response = await notificationRequest();
         const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Unable to load notifications.');
         const items = result.items || [];
         const unreadCount = Number(result.unread_count || 0);
         badge.textContent = unreadCount > 0 ? (unreadCount > 99 ? '99+' : String(unreadCount)) : '';
@@ -591,13 +595,17 @@ document.addEventListener('DOMContentLoaded', () => {
           list.innerHTML = '<p class="notification-empty">No notifications yet.</p>';
           return;
         }
-        list.innerHTML = items.map(item => `<button type="button" class="notification-item${item.read_at ? '' : ' unread'}" data-notification-id="${item.id}" data-leave-id="${item.leave_id || ''}">
+        list.innerHTML = items.map(item => `<button type="button" class="notification-item${item.read_at ? '' : ' unread'}" data-notification-id="${item.id}" data-leave-id="${item.leave_id || ''}" data-notification-type="${escapeHtml(item.type || '')}">
           <span class="notification-item-title">${escapeHtml(item.title)}</span>
           <span>${escapeHtml(item.message)}</span>
+          ${role === 'warden' && item.student_name ? `<span class="notification-student-details">${escapeHtml(item.student_name)} · ${escapeHtml(item.sap_id || '')} · Year ${escapeHtml(item.student_year || '-')} · ${escapeHtml(item.hostel_block || 'Hostel not set')} · Room ${escapeHtml(item.room_no || '-')}</span>` : ''}
           <small>${new Date(item.created_at).toLocaleString()}</small>
         </button>`).join('');
       } catch (error) {
+        console.error(error);
         list.innerHTML = '<p class="notification-empty">Notifications could not be loaded.</p>';
+      } finally {
+        loadingNotifications = false;
       }
     }
 
@@ -607,8 +615,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!panel.classList.contains('hidden')) await loadNotifications();
     });
     document.getElementById(`${role}-notifications-clear`).addEventListener('click', async () => {
-      await notificationRequest('clear');
-      await loadNotifications();
+      try {
+        const response = await notificationRequest('clear');
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Unable to clear notifications.');
+        await loadNotifications();
+      } catch (error) {
+        console.error(error);
+        list.innerHTML = '<p class="notification-empty">Notifications could not be cleared. Please try again.</p>';
+      }
     });
     document.getElementById(`${role}-notifications-close`).addEventListener('click', () => {
       panel.classList.add('hidden');
@@ -617,16 +632,34 @@ document.addEventListener('DOMContentLoaded', () => {
     list.addEventListener('click', async event => {
       const item = event.target.closest('.notification-item');
       if (!item) return;
-      await notificationRequest('read', Number(item.dataset.notificationId));
+      try {
+        const response = await notificationRequest('read', Number(item.dataset.notificationId));
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Unable to open this notification.');
+      } catch (error) {
+        console.error(error);
+        return;
+      }
       panel.classList.add('hidden');
+      const leaveId = item.dataset.leaveId;
       if (role === 'warden') {
-        await refreshPendingRequests();
-        document.querySelector('.notification-wrapper')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (leaveId && item.dataset.notificationType === 'leave_submitted') {
+          await refreshPendingRequests(leaveId);
+          const leaveCard = document.getElementById(`leave-${leaveId}`);
+          leaveCard?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          if (leaveCard) {
+            leaveCard.classList.add('notification-focus');
+            setTimeout(() => leaveCard.classList.remove('notification-focus'), 2200);
+          }
+        } else {
+          await refreshPendingRequests();
+        }
       } else {
         await loadStudentHistory();
       }
-      const leaveId = item.dataset.leaveId;
-      if (leaveId) setTimeout(() => document.getElementById(`leave-${leaveId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 250);
+      if (leaveId && role !== 'warden') {
+        setTimeout(() => document.getElementById(`leave-${leaveId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 250);
+      }
       await loadNotifications();
     });
     await loadNotifications();
@@ -1200,7 +1233,10 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="flex items-center gap-3">${notificationBellMarkup('warden')}<button type="button" data-logout-button class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold">Logout</button></div>
         </div>
         <section class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
-          <h2 class="text-2xl font-semibold text-gray-700 mb-4">Pending Verification</h2>
+          <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 class="text-2xl font-semibold text-gray-700">Pending Verification</h2>
+            <button id="warden-show-all-pending" type="button" class="hidden rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700">Show all pending requests</button>
+          </div>
           <div id="warden-pending-list" class="space-y-4"></div>
         </section>
         <section class="mt-4">
@@ -1239,7 +1275,11 @@ document.addEventListener('DOMContentLoaded', () => {
         <section class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm mt-6">
           <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
             <h2 class="text-2xl font-semibold text-gray-700">Approved Leave History</h2>
-            <button id="warden-download-approved-csv" type="button" disabled class="bg-green-700 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50">Download CSV</button>
+            <div class="flex flex-wrap gap-2">
+              <button id="warden-download-approved-csv" type="button" disabled class="bg-green-700 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50">Download All Approved CSV</button>
+              <button id="warden-download-weekly-report" type="button" class="rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white">Download This Week CSV</button>
+              <button id="warden-download-monthly-report" type="button" class="rounded-lg bg-indigo-700 px-4 py-2 font-semibold text-white">Download This Month CSV</button>
+            </div>
           </div>
           <div id="warden-approved-history" class="overflow-x-auto" aria-live="polite"></div>
         </section>
@@ -1261,6 +1301,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!document.hidden) void loadWardenGateAttendance();
     }, 60000);
     document.getElementById('warden-download-approved-csv').addEventListener('click', downloadWardenApprovedCsv);
+    document.getElementById('warden-download-weekly-report').addEventListener('click', () => downloadWardenPeriodReport('weekly'));
+    document.getElementById('warden-download-monthly-report').addEventListener('click', () => downloadWardenPeriodReport('monthly'));
     void setupNotifications('warden');
     void setupAnnouncements('warden');
     void loadLeaveCalendar('warden');
@@ -1356,22 +1398,30 @@ document.addEventListener('DOMContentLoaded', () => {
     window.location.assign(`/api/index.php?endpoint=export_gate_attendance.php&${params.toString()}`);
   }
 
-  async function refreshPendingRequests() {
+  async function refreshPendingRequests(focusLeaveId = '') {
     const target = document.getElementById('warden-pending-list');
     if (!target) return;
     target.className = 'space-y-4';
+    const showAllButton = document.getElementById('warden-show-all-pending');
+    if (!focusLeaveId && showAllButton) showAllButton.classList.add('hidden');
     try {
       const params = new URLSearchParams({
         status: 'Pending Verification',
         limit: '20',
-        page: String(wardenPendingPage)
+        page: String(focusLeaveId ? 1 : wardenPendingPage)
       });
+      if (focusLeaveId) params.set('leave_id', focusLeaveId);
       const response = await fetch(`/api/index.php?endpoint=list_leaves.php&${params.toString()}`);
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.message || 'Unable to load pending requests.');
       const items = result.items || [];
       wardenPendingTotal = Number(result.total) || 0;
       if (!items.length) {
+        if (focusLeaveId) {
+          target.textContent = 'This request is no longer pending. The pending request list has been refreshed.';
+          await refreshPendingRequests();
+          return;
+        }
         if (wardenPendingPage > 1) {
           wardenPendingPage -= 1;
           await refreshPendingRequests();
@@ -1449,11 +1499,18 @@ document.addEventListener('DOMContentLoaded', () => {
         content.appendChild(article);
       });
       target.replaceChildren(content);
-      const controls = createPaginationControls(wardenPendingPage, wardenPendingTotal, 20, page => {
-        wardenPendingPage = page;
+      showAllButton.classList.toggle('hidden', !focusLeaveId);
+      showAllButton.onclick = focusLeaveId ? () => {
+        wardenPendingPage = 1;
         void refreshPendingRequests();
-      });
-      if (controls) target.appendChild(controls);
+      } : null;
+      if (!focusLeaveId) {
+        const controls = createPaginationControls(wardenPendingPage, wardenPendingTotal, 20, page => {
+          wardenPendingPage = page;
+          void refreshPendingRequests();
+        });
+        if (controls) target.appendChild(controls);
+      }
     } catch (error) {
       console.error(error);
       target.textContent = error.message || 'Unable to load pending requests.';
@@ -1777,6 +1834,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function downloadWardenPeriodReport(period) {
+    if (!['weekly', 'monthly'].includes(period)) {
+      window.alert('Choose a weekly or monthly report.');
+      return;
+    }
+    window.location.assign(`/api/index.php?endpoint=warden_period_report.php&period=${encodeURIComponent(period)}`);
+  }
+
   async function setupAnnouncements(role) {
     const target = document.getElementById(`${role}-announcements`);
     if (!target) return;
@@ -1967,61 +2032,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
     await load();
-  }
-
-  async function loadAdminAuditHistory() {
-    const target = document.getElementById('admin-audit-history');
-    if (!target) return;
-    const filter = document.getElementById('admin-audit-filter');
-    const refresh = document.getElementById('admin-audit-refresh');
-    if (refresh && !refresh.dataset.bound) {
-      refresh.dataset.bound = '1';
-      refresh.addEventListener('click', loadAdminAuditHistory);
-    }
-    const params = new URLSearchParams({ limit: '50' });
-    if (filter?.value.trim()) params.set('action', filter.value.trim());
-    target.textContent = 'Loading audit history...';
-    try {
-      const response = await fetch(`/api/index.php?endpoint=audit_history.php&${params.toString()}`);
-      const result = await response.json();
-      if (!response.ok || !result.success) throw new Error(result.message || 'Unable to load audit history.');
-      if (!result.items.length) {
-        target.textContent = 'No audit events found.';
-        return;
-      }
-      const table = document.createElement('table');
-      table.className = 'min-w-full border border-gray-200 text-sm';
-      const headings = ['When', 'Actor', 'Role', 'Action', 'Entity', 'Details'];
-      const thead = document.createElement('thead');
-      thead.className = 'bg-gray-100 text-left';
-      const headerRow = document.createElement('tr');
-      headings.forEach(label => {
-        const cell = document.createElement('th');
-        cell.className = 'whitespace-nowrap px-3 py-2';
-        cell.textContent = label;
-        headerRow.appendChild(cell);
-      });
-      thead.appendChild(headerRow);
-      table.appendChild(thead);
-      const tbody = document.createElement('tbody');
-      result.items.forEach(item => {
-        const row = document.createElement('tr');
-        row.className = 'border-t border-gray-200';
-        [new Date(item.created_at).toLocaleString(), item.actor_name, item.actor_role, item.action, `${item.entity}${item.entity_id ? ` #${item.entity_id}` : ''}`, typeof item.details === 'string' ? item.details : JSON.stringify(item.details || {})].forEach(value => {
-          const cell = document.createElement('td');
-          cell.className = 'max-w-sm break-words px-3 py-2';
-          cell.textContent = value || '-';
-          row.appendChild(cell);
-        });
-        tbody.appendChild(row);
-      });
-      table.appendChild(tbody);
-      target.replaceChildren(table);
-    } catch (error) {
-      console.error(error);
-      target.textContent = error.message || 'Unable to load audit history.';
-      target.className = 'overflow-x-auto text-sm text-red-600';
-    }
   }
 
   function extractPassToken(decodedValue) {
@@ -2459,11 +2469,6 @@ document.addEventListener('DOMContentLoaded', () => {
           </form>
           <div id="admin-announcement-list" class="mt-4 space-y-3">Loading announcements...</div>
         </section>
-        <section class="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <h2 class="mb-3 text-xl font-semibold text-gray-800">Audit History</h2>
-          <div class="mb-3 flex flex-wrap gap-2"><input id="admin-audit-filter" class="rounded-lg border border-gray-300 p-2" placeholder="Filter action" /><button id="admin-audit-refresh" type="button" class="rounded-lg bg-gray-700 px-4 py-2 text-white">Refresh</button></div>
-          <div id="admin-audit-history" class="overflow-x-auto">Loading audit history...</div>
-        </section>
       </div>
     `;
     document.getElementById('student-import-form').addEventListener('submit', async event => {
@@ -2530,7 +2535,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     setupAdminPolicies();
     setupAdminAnnouncements();
-    loadAdminAuditHistory();
   }
 
   loginForm.addEventListener('submit', event => {
