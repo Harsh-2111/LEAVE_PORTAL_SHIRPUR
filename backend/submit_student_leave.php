@@ -2,6 +2,7 @@
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/notifications.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -159,6 +160,11 @@ try {
         'room_no' => $roomNo,
     ], $_SERVER['REMOTE_ADDR'] ?? null);
     $pdo->commit();
+    try {
+        notifyWarden($pdo, $leaveId, 'leave_submitted', 'New leave request', 'A student from your hostel submitted a leave request for review.');
+    } catch (Throwable $notificationError) {
+        error_log('Unable to create leave notification: ' . $notificationError->getMessage());
+    }
 } catch (Throwable $error) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();

@@ -550,6 +550,81 @@ document.addEventListener('DOMContentLoaded', () => {
     showLogin();
   }
 
+  function notificationBellMarkup(role) {
+    return `<div class="notification-wrapper relative">
+      <button type="button" id="${role}-notifications-button" class="notification-bell" aria-label="Notifications" aria-expanded="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+        <span id="${role}-notification-count" class="notification-count hidden">0</span>
+      </button>
+      <div id="${role}-notification-panel" class="notification-panel hidden">
+        <div class="notification-panel-header"><strong>Notifications</strong><button type="button" id="${role}-notifications-clear">Clear all</button></div>
+        <div id="${role}-notification-list" class="notification-list"><p class="notification-empty">Loading notifications...</p></div>
+      </div>
+    </div>`;
+  }
+
+  async function notificationRequest(action = '', notificationId = 0) {
+    const form = action ? getCsrfFormData({ action, notification_id: notificationId }) : null;
+    return fetch('/api/index.php?endpoint=get_notifications.php', action ? { method: 'POST', body: form } : {});
+  }
+
+  async function setupNotifications(role) {
+    const button = document.getElementById(`${role}-notifications-button`);
+    const panel = document.getElementById(`${role}-notification-panel`);
+    if (!button || !panel) return;
+    const badge = document.getElementById(`${role}-notification-count`);
+    const list = document.getElementById(`${role}-notification-list`);
+
+    async function loadNotifications() {
+      try {
+        const response = await notificationRequest();
+        const result = await response.json();
+        const items = result.items || [];
+        badge.textContent = String(result.unread_count || 0);
+        badge.classList.toggle('hidden', !result.unread_count);
+        if (!items.length) {
+          list.innerHTML = '<p class="notification-empty">No notifications yet.</p>';
+          return;
+        }
+        list.innerHTML = items.map(item => `<button type="button" class="notification-item${item.read_at ? '' : ' unread'}" data-notification-id="${item.id}" data-leave-id="${item.leave_id || ''}">
+          <span class="notification-item-title">${escapeHtml(item.title)}</span>
+          <span>${escapeHtml(item.message)}</span>
+          <small>${new Date(item.created_at).toLocaleString()}</small>
+        </button>`).join('');
+      } catch (error) {
+        list.innerHTML = '<p class="notification-empty">Notifications could not be loaded.</p>';
+      }
+    }
+
+    button.addEventListener('click', async () => {
+      panel.classList.toggle('hidden');
+      button.setAttribute('aria-expanded', String(!panel.classList.contains('hidden')));
+      if (!panel.classList.contains('hidden')) await loadNotifications();
+    });
+    document.getElementById(`${role}-notifications-clear`).addEventListener('click', async () => {
+      await notificationRequest('clear');
+      await loadNotifications();
+    });
+    list.addEventListener('click', async event => {
+      const item = event.target.closest('.notification-item');
+      if (!item) return;
+      await notificationRequest('read', Number(item.dataset.notificationId));
+      panel.classList.add('hidden');
+      if (role === 'warden') {
+        await refreshPendingRequests();
+        document.querySelector('.notification-wrapper')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        await loadStudentHistory();
+      }
+      const leaveId = item.dataset.leaveId;
+      if (leaveId) setTimeout(() => document.getElementById(`leave-${leaveId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 250);
+      await loadNotifications();
+    });
+    await loadNotifications();
+    if (window.notificationPollTimer) clearInterval(window.notificationPollTimer);
+    window.notificationPollTimer = setInterval(() => { if (!document.hidden) loadNotifications(); }, 30000);
+  }
+
   async function showStudentPage() {
     hideAllPages();
     appContainer.classList.add('portal-wide');
@@ -565,6 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </span>
                 <span id="student-profile-display-name" class="max-w-[180px] truncate text-sm font-semibold text-gray-700"></span>
               </div>
+              ${notificationBellMarkup('student')}
               <button type="button" id="student-change-password-button" class="bg-amber-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-amber-600">Change Password</button>
               <button type="button" data-logout-button class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold">Logout</button>
             </div>
@@ -807,6 +883,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
     await loadStudentHistory();
+    await setupNotifications('student');
   }
 
   async function handleChangePassword(event) {
@@ -887,7 +964,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <th class="py-3 px-4 text-left">Reason</th><th class="py-3 px-4 text-left">Status</th><th class="py-3 px-4 text-left">Pass</th>
             </tr></thead>
             <tbody>${items.map(item => `
-              <tr class="border-b border-gray-200 hover:bg-gray-100">
+              <tr id="leave-${item.id}" class="border-b border-gray-200 hover:bg-gray-100">
                 <td class="py-3 px-4">${item.start_date} ${item.start_time || ''}</td><td class="py-3 px-4">${item.end_date} ${item.end_time || ''}</td><td class="py-3 px-4">${item.room_no || '-'}</td><td class="py-3 px-4">${escapeHtml(item.home_address || '-')}</td>
                 <td class="py-3 px-4">${item.leave_days}</td><td class="py-3 px-4">${item.school || '-'} / ${item.hostel || '-'}</td>
                 <td class="py-3 px-4">${item.reason}</td><td class="py-3 px-4">${item.status}</td>
@@ -1064,7 +1141,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="max-w-5xl mx-auto">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div><h1 class="text-3xl font-bold text-gray-800">${hostelGroup} Warden</h1><p class="text-sm text-gray-600 mt-1">Signed in as ${state.user?.name || 'Warden'}</p></div>
-          <button type="button" data-logout-button class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold">Logout</button>
+          <div class="flex items-center gap-3">${notificationBellMarkup('warden')}<button type="button" data-logout-button class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold">Logout</button></div>
         </div>
         <section class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
           <h2 class="text-2xl font-semibold text-gray-700 mb-4">Pending Verification</h2>
@@ -1120,6 +1197,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!document.hidden) void loadWardenGateAttendance();
     }, 60000);
     document.getElementById('warden-download-approved-csv').addEventListener('click', downloadWardenApprovedCsv);
+    void setupNotifications('warden');
   }
 
   async function loadWardenGateAttendance() {
@@ -1239,6 +1317,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const content = document.createDocumentFragment();
       items.forEach(item => {
         const article = document.createElement('article');
+        article.id = `leave-${item.id}`;
         article.className = 'border border-gray-200 rounded-lg p-4 bg-gray-50';
         const fields = [
           [`${item.name || ''} (${item.sap_id || ''})`, 'font-semibold'],

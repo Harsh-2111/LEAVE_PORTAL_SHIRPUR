@@ -20,6 +20,7 @@ $endpoints = [
     'get_warden_gate_logs.php' => 'get_warden_gate_logs.php',
     'export_gate_attendance.php' => 'export_gate_attendance.php',
     'cleanup_history.php' => 'cleanup_history.php',
+    'get_notifications.php' => 'get_notifications.php',
     'import_students.php' => 'import_students.php',
 ];
 

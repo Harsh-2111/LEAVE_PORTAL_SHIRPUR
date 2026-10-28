@@ -2,6 +2,7 @@
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/notifications.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -118,6 +119,13 @@ try {
 
     writeAudit($pdo, (int)$user['id'], 'record_call', 'leave_requests', $leaveId, $details, $_SERVER['REMOTE_ADDR'] ?? null);
     $pdo->commit();
+    try {
+        if ($outcome === 'Confirmed') notifyStudent($pdo, $leaveId, 'leave_approved', 'Leave approved', 'Your leave was approved by the warden. Your gate pass is ready.');
+        elseif ($outcome === 'Denied') notifyStudent($pdo, $leaveId, 'leave_rejected', 'Leave rejected', 'Your leave request was rejected by the warden.');
+        else notifyStudent($pdo, $leaveId, 'leave_followup', 'Warden call follow-up', 'The warden could not complete verification: ' . $outcome . '.');
+    } catch (Throwable $notificationError) {
+        error_log('Unable to create student leave notification: ' . $notificationError->getMessage());
+    }
 
     echo json_encode([
         'success' => true,

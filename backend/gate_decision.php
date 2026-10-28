@@ -2,6 +2,7 @@
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/notifications.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -95,6 +96,11 @@ try {
             writeAudit($pdo, (int)$user['id'], 'gate_pass_accepted', 'leave_requests', $leaveId, ['sap_id' => trim((string)$pass['sap_id']), 'decision' => 'exit'], $_SERVER['REMOTE_ADDR'] ?? null);
             writeAudit($pdo, (int)$user['id'], 'gate_exit_recorded', 'leave_requests', $leaveId, ['sap_id' => trim((string)$pass['sap_id'])], $_SERVER['REMOTE_ADDR'] ?? null);
             $pdo->commit();
+            try {
+                notifyLeave($pdo, $leaveId, 'gate_exit', 'Gate exit recorded', 'The student has checked out from the hostel gate.');
+            } catch (Throwable $notificationError) {
+                error_log('Unable to create gate exit notification: ' . $notificationError->getMessage());
+            }
             echo json_encode(['success' => true, 'decision' => 'exit', 'already_decided' => false, 'message' => 'Gate exit recorded.']);
             exit;
         }
@@ -165,6 +171,11 @@ try {
 
         writeAudit($pdo, (int)$user['id'], 'gate_entry_recorded', 'leave_requests', $leaveId, ['sap_id' => trim((string)$pass['sap_id']), 'return_timing_status' => $timingStatus, 'variance_summary' => $varianceSummary], $_SERVER['REMOTE_ADDR'] ?? null);
         $pdo->commit();
+        try {
+            notifyLeave($pdo, $leaveId, 'gate_entry', 'Gate entry recorded', 'The student has checked in. Return timing: ' . $varianceSummary . '.');
+        } catch (Throwable $notificationError) {
+            error_log('Unable to create gate entry notification: ' . $notificationError->getMessage());
+        }
         echo json_encode(['success' => true, 'decision' => 'entry', 'return_timing_status' => $timingStatus, 'variance_summary' => $varianceSummary, 'already_decided' => false, 'message' => 'Gate entry recorded: ' . $varianceSummary . '.']);
         exit;
     }
