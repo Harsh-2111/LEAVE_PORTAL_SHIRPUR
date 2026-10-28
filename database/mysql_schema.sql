@@ -24,6 +24,7 @@ CREATE TABLE `students` (
   `room_no` VARCHAR(50) DEFAULT NULL,
   `parent_name` VARCHAR(150) DEFAULT NULL,
   `parent_email` VARCHAR(255) DEFAULT NULL,
+  `official_email_id` VARCHAR(255) DEFAULT NULL,
   `parent_contact` VARCHAR(20) DEFAULT NULL,
   `mother_contact` VARCHAR(20) DEFAULT NULL,
   `is_active` TINYINT(1) NOT NULL DEFAULT 1,
