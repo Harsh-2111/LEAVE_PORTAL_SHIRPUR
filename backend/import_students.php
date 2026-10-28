@@ -177,16 +177,45 @@ while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
     $studentName = $record['name'] ?? '';
     $yearInput = strtolower(trim($record['year'] ?? ''));
     $year = '';
-    if (preg_match('/^([1-5])(?:st|nd|rd|th)?(?:\s+year)?$/', $yearInput, $yearMatch) === 1) {
-        $yearSuffix = ['1' => 'st', '2' => 'nd', '3' => 'rd'][$yearMatch[1]] ?? 'th';
-        $year = $yearMatch[1] . $yearSuffix . ' Year';
+    if (preg_match('/^(?:year[\s._-]*)?([1-5])(?:st|nd|rd|th)?(?:[\s._-]*year)?$/', $yearInput, $yearMatch) === 1) {
+        $yearNumber = (int)$yearMatch[1];
+    } elseif (
+        preg_match('/^(?:semester|sem|s)[\s._-]*([1-8])$/', $yearInput, $semesterMatch) === 1
+        || preg_match('/^([1-8])(?:st|nd|rd|th)?[\s._-]*semester$/', $yearInput, $semesterMatch) === 1
+    ) {
+        $yearNumber = (int)ceil((int)$semesterMatch[1] / 2);
+    } else {
+        $yearNumber = 0;
+    }
+    if ($yearNumber > 0) {
+        $yearSuffix = ['1' => 'st', '2' => 'nd', '3' => 'rd'][$yearNumber] ?? 'th';
+        $year = $yearNumber . $yearSuffix . ' Year';
     }
     $branch = $record['branch'] ?? '';
     $batch = $record['batch'] ?? '';
     $studentContact = trim($record['student_contact'] ?? '');
-    $gender = strtolower($record['gender'] ?? '');
+    $genderInput = strtolower(trim($record['gender'] ?? ''));
+    $gender = match ($genderInput) {
+        'm', 'male' => 'male',
+        'f', 'female' => 'female',
+        default => '',
+    };
     $courseInput = (string)preg_replace('/[^a-z]/', '', strtolower($record['course'] ?? ''));
     $course = $courseMap[$courseInput] ?? '';
+    if ($course === '') {
+        foreach ([
+            'mbatech' => 'MBATech',
+            'btech' => 'BTech',
+            'bpharm' => 'BPharm',
+            'mpharm' => 'MPharm',
+            'agriculture' => 'Agriculture',
+        ] as $coursePrefix => $canonicalCourse) {
+            if (str_starts_with($courseInput, $coursePrefix)) {
+                $course = $canonicalCourse;
+                break;
+            }
+        }
+    }
     $parentEmail = $record['parent_email'] ?? '';
     $officialEmail = strtolower($record['official_email_id'] ?? '');
     $fatherContact = $record['parent_contact'] ?? '';
@@ -207,7 +236,7 @@ while (($row = fgetcsv($handle, null, ',', '"', '')) !== false) {
         || $branch === ''
         || !in_array($gender, ['male', 'female'], true) || $course === ''
     ) {
-        $addError($lineNumber, $sapId, 'Required fields are missing or too long, or the year, gender, or course is invalid.');
+        $addError($lineNumber, $sapId, 'Required fields are missing or too long, or year must be a year/semester value, gender must be Male/Female, and course must be a supported program.');
         continue;
     }
     if (

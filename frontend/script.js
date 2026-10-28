@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const optionalScriptLoads = new Map();
   let loginProgressTimer = null;
+  let signupProgressTimer = null;
   let wardenAttendanceTimer = null;
   let securityQrScanner = null;
   let handlingSecurityScan = false;
@@ -137,6 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function closeSignupModal() {
+    resetSignupProgress();
     document.getElementById('signup-identity-form').reset();
     document.getElementById('signup-password-form').reset();
     document.getElementById('signup-identity-form').classList.remove('hidden');
@@ -156,6 +158,44 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('password').value = '';
     document.getElementById('password').focus();
     showMessage(loginMessage, message, 'text-blue-700 bg-blue-50');
+  }
+
+  function resetSignupProgress() {
+    if (signupProgressTimer) {
+      clearInterval(signupProgressTimer);
+      signupProgressTimer = null;
+    }
+    document.getElementById('signup-progress-wrapper')?.classList.add('hidden');
+    const bar = document.getElementById('signup-progress-bar');
+    const text = document.getElementById('signup-progress-text');
+    if (bar) bar.style.width = '0%';
+    if (text) text.textContent = '0%';
+  }
+
+  function animateSignupProgress() {
+    const wrapper = document.getElementById('signup-progress-wrapper');
+    const bar = document.getElementById('signup-progress-bar');
+    const text = document.getElementById('signup-progress-text');
+    if (!wrapper || !bar || !text) return;
+    resetSignupProgress();
+    wrapper.classList.remove('hidden');
+    let progress = 0;
+    signupProgressTimer = setInterval(() => {
+      progress = Math.min(progress + 9 + Math.random() * 12, 96);
+      bar.style.width = `${progress}%`;
+      text.textContent = `${Math.round(progress)}%`;
+    }, 100);
+  }
+
+  function completeSignupProgress() {
+    if (signupProgressTimer) {
+      clearInterval(signupProgressTimer);
+      signupProgressTimer = null;
+    }
+    const bar = document.getElementById('signup-progress-bar');
+    const text = document.getElementById('signup-progress-text');
+    if (bar) bar.style.width = '100%';
+    if (text) text.textContent = '100%';
   }
 
   async function handleSignupVerification(event) {
@@ -179,10 +219,12 @@ document.addEventListener('DOMContentLoaded', () => {
     formData.append('parent_contact', parentContact);
     formData.append('official_email_id', document.getElementById('signup-official-email').value.trim());
 
+    animateSignupProgress();
     try {
       const response = await fetch('/api/index.php?endpoint=signup.php', { method: 'POST', body: formData });
       const result = await response.json();
       if (!response.ok || !result.success) {
+        resetSignupProgress();
         if (result.account_exists) {
           redirectRegisteredStudentToLogin(
             document.getElementById('signup-sap-id').value.trim(),
@@ -196,11 +238,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
       state.signupToken = result.signup_token;
       state.signupCsrfToken = result.csrf_token;
+      completeSignupProgress();
       document.getElementById('signup-identity-form').classList.add('hidden');
       document.getElementById('signup-password-form').classList.remove('hidden');
       hideMessage(message);
     } catch (error) {
       console.error(error);
+      resetSignupProgress();
       showMessage(message, 'Account verification failed. Please try again.', 'text-red-700 bg-red-50');
     } finally {
       button.disabled = false;
