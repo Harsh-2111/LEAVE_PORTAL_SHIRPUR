@@ -2055,16 +2055,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasGateDecision = ['accept', 'reject'].includes(result.gate_decision);
     const hasExited = Boolean(result.gate_out_time);
     const hasEntered = Boolean(result.gate_in_time);
+    const scheduledStart = result.start_date
+      ? new Date(`${result.start_date}T${result.start_time || '00:00:00'}+05:30`)
+      : null;
+    const exitNotYetValid = result.status === 'Granted'
+      && scheduledStart instanceof Date
+      && !Number.isNaN(scheduledStart.getTime())
+      && Date.now() < scheduledStart.getTime();
     const badgeColor = hasGateDecision && result.gate_decision === 'reject'
       ? 'bg-red-700 text-white'
       : result.status === 'CHECKED_OUT' ? 'bg-amber-600 text-white'
       : result.status === 'CHECKED_IN' ? 'bg-green-700 text-white'
+      : exitNotYetValid ? 'bg-amber-600 text-white'
       : result.valid_qr ? 'bg-green-700 text-white' : 'bg-amber-600 text-white';
     badge.className = `mt-2 inline-flex max-w-full whitespace-normal break-words rounded px-3 py-1 text-sm font-bold sm:text-lg ${badgeColor}`;
     badge.textContent = result.status === 'CHECKED_OUT'
       ? 'CURRENTLY OUTSIDE'
       : result.status === 'CHECKED_IN'
         ? 'RETURN RECORDED'
+        : exitNotYetValid
+          ? 'NOT YET VALID FOR EXIT'
         : hasGateDecision && result.gate_decision === 'reject'
           ? 'ALREADY REJECTED AT GATE'
           : result.valid_qr ? 'PASS VERIFIED' : 'PASS FOUND - QR SIGNATURE UNVERIFIED';
@@ -2098,7 +2108,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     card.appendChild(details);
 
-    if (result.valid_qr && result.pass_token && result.status === 'Granted' && !hasExited && result.gate_decision !== 'reject') {
+    if (exitNotYetValid) {
+      const notice = document.createElement('p');
+      notice.className = 'mt-4 rounded-lg bg-amber-100 p-3 text-sm font-semibold text-amber-900';
+      notice.textContent = `This pass is not valid for gate exit until ${scheduledStart.toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      })} IST.`;
+      card.appendChild(notice);
+    } else if (result.valid_qr && result.pass_token && result.status === 'Granted' && !hasExited && result.gate_decision !== 'reject') {
       const actions = document.createElement('div');
       actions.className = 'mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2';
       const exitButton = document.createElement('button');

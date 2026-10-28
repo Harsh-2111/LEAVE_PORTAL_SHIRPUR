@@ -29,7 +29,7 @@ try {
         ? "(gate_out_time IS NOT NULL AND gate_out_time <= NOW() - INTERVAL '24 hours')"
         : '(gate_out_time IS NOT NULL AND gate_out_time <= NOW() - INTERVAL 24 HOUR)';
     $stmt = $pdo->prepare(
-        'SELECT sap_id, qr_code_data, status, end_date, end_time, gate_out_time, gate_in_time, '
+        'SELECT sap_id, qr_code_data, status, start_date, start_time, end_date, end_time, gate_out_time, gate_in_time, '
         . 'CASE WHEN ' . $entryEligibility . ' THEN 1 ELSE 0 END AS gate_entry_available '
         . 'FROM leave_requests WHERE id = ? AND pass_token = ? '
         . 'AND status IN (\'Granted\', \'CHECKED_OUT\', \'CHECKED_IN\') LIMIT 1 FOR UPDATE'
@@ -69,6 +69,22 @@ try {
                 $pdo->rollBack();
                 http_response_code(409);
                 echo json_encode(['success' => false, 'message' => 'This pass cannot be used to record a gate exit.']);
+                exit;
+            }
+
+            $campusTimezone = new DateTimeZone('Asia/Kolkata');
+            $scheduledStart = new DateTimeImmutable(
+                (string)$pass['start_date'] . ' ' . ((string)($pass['start_time'] ?? '') ?: '00:00:00'),
+                $campusTimezone
+            );
+            if (new DateTimeImmutable('now', $campusTimezone) < $scheduledStart) {
+                $pdo->rollBack();
+                http_response_code(409);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'This pass is not valid for gate exit until ' . $scheduledStart->format('d M Y, h:i A') . ' (IST).',
+                    'valid_from' => $scheduledStart->format(DateTimeInterface::ATOM),
+                ]);
                 exit;
             }
 
