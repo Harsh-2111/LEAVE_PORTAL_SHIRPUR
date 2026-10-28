@@ -162,10 +162,15 @@ document.addEventListener('DOMContentLoaded', () => {
     event.preventDefault();
     const button = document.getElementById('verify-signup-button');
     const message = document.getElementById('signup-identity-message');
+    const sapId = document.getElementById('signup-sap-id').value.trim();
+    if (!/^\d{11}$/.test(sapId)) {
+      showMessage(message, 'SAP ID must contain exactly 11 digits.', 'text-red-700 bg-red-50');
+      return;
+    }
     button.disabled = true;
     const formData = new FormData();
     formData.append('action', 'verify');
-    formData.append('sap_id', document.getElementById('signup-sap-id').value.trim());
+    formData.append('sap_id', sapId);
     formData.append('parent_contact', document.getElementById('signup-parent-contact').value.trim());
     formData.append('parent_email', document.getElementById('signup-parent-email').value.trim());
 
@@ -427,6 +432,14 @@ document.addEventListener('DOMContentLoaded', () => {
       security: 'Security Login'
     };
     roleTitle.textContent = labels[roleSelect.value] || 'Login';
+    const loginIdInput = document.getElementById('user-id');
+    const isStudent = roleSelect.value === 'student';
+    loginIdInput.inputMode = isStudent ? 'numeric' : 'text';
+    loginIdInput.maxLength = isStudent ? 11 : 100;
+    loginIdInput.minLength = isStudent ? 11 : 0;
+    loginIdInput.pattern = isStudent ? '[0-9]{11}' : '';
+    loginIdInput.placeholder = isStudent ? '11-digit SAP ID' : 'Login ID';
+    if (isStudent) loginIdInput.value = loginIdInput.value.replace(/\D/g, '').slice(0, 11);
     document.getElementById('student-forgot-password-button')?.classList.toggle('hidden', roleSelect.value !== 'student');
     document.getElementById('student-signup-button')?.classList.toggle('hidden', roleSelect.value !== 'student');
     document.getElementById('student-auth-divider')?.classList.toggle('hidden', roleSelect.value !== 'student');
@@ -495,6 +508,10 @@ document.addEventListener('DOMContentLoaded', () => {
   async function handleLogin() {
     const loginId = document.getElementById('user-id').value.trim();
     const password = document.getElementById('password').value;
+    if (roleSelect.value === 'student' && !/^\d{11}$/.test(loginId)) {
+      showMessage(loginMessage, 'Student SAP ID must contain exactly 11 digits.', 'error');
+      return;
+    }
     if (!loginId || !password) {
       showMessage(loginMessage, 'Please enter both ID and password.', 'error');
       return;
@@ -2569,6 +2586,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
   roleSelect.addEventListener('change', updateRoleTitle);
+  const loginIdInput = document.getElementById('user-id');
+  const signupSapIdInput = document.getElementById('signup-sap-id');
+  [loginIdInput, signupSapIdInput].forEach(input => {
+    input.addEventListener('input', () => {
+      if (roleSelect.value !== 'student' && input === loginIdInput) return;
+      input.value = input.value.replace(/\D/g, '').slice(0, 11);
+    });
+  });
+  updateRoleTitle();
   document.addEventListener('click', event => {
     if (event.target.closest('[data-logout-button]')) logoutModal.classList.remove('hidden');
   });
