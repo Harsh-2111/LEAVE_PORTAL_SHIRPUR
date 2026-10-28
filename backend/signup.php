@@ -30,12 +30,11 @@ if ($action === 'verify') {
     }
 
     $sapId = trim((string)($_POST['sap_id'] ?? ''));
-    $contact = preg_replace('/\D+/', '', (string)($_POST['parent_contact'] ?? ''));
+    $contact = trim((string)($_POST['parent_contact'] ?? ''));
     $email = strtolower(trim((string)($_POST['parent_email'] ?? '')));
 
     if (!preg_match('/^\d{11}$/', $sapId)
-        || strlen($contact) < 7
-        || strlen($contact) > 20
+        || !preg_match('/^\d{10}$/', $contact)
         || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Enter a valid SAP ID, parent contact number, and parent email address.']);
@@ -71,8 +70,8 @@ if ($action === 'verify') {
     $student = $studentStmt->fetch();
     $registeredContacts = $student
         ? [
-            preg_replace('/\D+/', '', (string)$student['parent_contact']),
-            preg_replace('/\D+/', '', (string)$student['mother_contact']),
+            normalizeIndianMobileNumber((string)$student['parent_contact']),
+            normalizeIndianMobileNumber((string)$student['mother_contact']),
         ]
         : [];
     $matchesContact = false;

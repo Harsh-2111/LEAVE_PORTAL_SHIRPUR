@@ -93,6 +93,15 @@ function databaseBool(mixed $value): bool
     return in_array(strtolower((string)$value), ['1', 't', 'true', 'yes', 'on'], true);
 }
 
+function normalizeIndianMobileNumber(string $value): string
+{
+    $digits = (string)preg_replace('/\D+/', '', $value);
+    if (strlen($digits) === 12 && str_starts_with($digits, '91')) {
+        return substr($digits, 2);
+    }
+    return $digits;
+}
+
 function requireCsrfToken(): void
 {
     startSecureSession();

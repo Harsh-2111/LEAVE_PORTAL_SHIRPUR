@@ -163,15 +163,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const button = document.getElementById('verify-signup-button');
     const message = document.getElementById('signup-identity-message');
     const sapId = document.getElementById('signup-sap-id').value.trim();
+    const parentContact = document.getElementById('signup-parent-contact').value.trim();
     if (!/^\d{11}$/.test(sapId)) {
       showMessage(message, 'SAP ID must contain exactly 11 digits.', 'text-red-700 bg-red-50');
+      return;
+    }
+    if (!/^\d{10}$/.test(parentContact)) {
+      showMessage(message, 'Parent contact number must contain exactly 10 digits.', 'text-red-700 bg-red-50');
       return;
     }
     button.disabled = true;
     const formData = new FormData();
     formData.append('action', 'verify');
     formData.append('sap_id', sapId);
-    formData.append('parent_contact', document.getElementById('signup-parent-contact').value.trim());
+    formData.append('parent_contact', parentContact);
     formData.append('parent_email', document.getElementById('signup-parent-email').value.trim());
 
     try {
@@ -268,11 +273,16 @@ document.addEventListener('DOMContentLoaded', () => {
     event.preventDefault();
     const button = document.getElementById('verify-forgot-password-button');
     const message = document.getElementById('forgot-password-identity-message');
+    const contact = document.getElementById('forgot-contact').value.trim();
+    if (!/^\d{10}$/.test(contact)) {
+      showMessage(message, 'Contact number must contain exactly 10 digits.', 'text-red-700 bg-red-50');
+      return;
+    }
     button.disabled = true;
     const formData = new FormData(event.currentTarget);
     formData.append('action', 'verify');
     formData.append('sap_id', document.getElementById('forgot-sap-id').value.trim());
-    formData.append('contact', document.getElementById('forgot-contact').value.trim());
+    formData.append('contact', contact);
     formData.append('email', document.getElementById('forgot-email').value.trim());
 
     try {
@@ -2592,6 +2602,12 @@ document.addEventListener('DOMContentLoaded', () => {
     input.addEventListener('input', () => {
       if (roleSelect.value !== 'student' && input === loginIdInput) return;
       input.value = input.value.replace(/\D/g, '').slice(0, 11);
+    });
+    ['signup-parent-contact', 'forgot-contact'].forEach(id => {
+      const input = document.getElementById(id);
+      input.addEventListener('input', () => {
+        input.value = input.value.replace(/\D/g, '').slice(0, 10);
+      });
     });
   });
   updateRoleTitle();
