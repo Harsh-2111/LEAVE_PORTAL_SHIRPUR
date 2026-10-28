@@ -84,6 +84,8 @@ Wardens receive notifications only for leave requests assigned to their hostel g
 
 The warden's Approved Leave History section also provides current-week (Monday through Sunday) and current-calendar-month CSV reports. Reports include approved leave details, scheduled dates, gate exit and entry times, return timing, and the security staff recorded for gate scans.
 
+Forgot-password access is available only to students. Admins can reset an active warden account from the Admin Portal; the generated temporary password is displayed once, and the warden must set a new password at the next login. Share temporary passwords securely. This reset feature uses the existing users and audit tables and requires no database migration.
+
 ## Demo accounts
 
 Choose the matching role on the login screen:

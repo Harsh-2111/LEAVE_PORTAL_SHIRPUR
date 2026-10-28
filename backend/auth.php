@@ -146,6 +146,26 @@ function requireAuth(): array
             ]);
             exit;
         }
+    } else {
+        $pdo = $GLOBALS['pdo'] ?? null;
+        if (!$pdo instanceof PDO) {
+            throw new RuntimeException('Database connection is not available for account validation.');
+        }
+
+        $accountStmt = $pdo->prepare(
+            'SELECT is_active, must_change_password FROM users WHERE id = ? AND role = ? LIMIT 1'
+        );
+        $accountStmt->execute([(int)$user['id'], (string)$user['role']]);
+        $account = $accountStmt->fetch();
+        if (!$account || !databaseBool($account['is_active'])) {
+            unset($_SESSION['user']);
+            session_regenerate_id(true);
+            http_response_code(401);
+            echo json_encode(['success' => false, 'message' => 'This account is inactive. Contact the administrator.']);
+            exit;
+        }
+        $user['must_change_password'] = databaseBool($account['must_change_password']);
+        $_SESSION['user']['must_change_password'] = $user['must_change_password'];
     }
 
     return $user;

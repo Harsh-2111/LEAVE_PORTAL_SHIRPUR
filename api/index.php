@@ -8,6 +8,7 @@ $endpoints = [
     'forgot_password.php' => 'forgot_password.php',
     'signup.php' => 'signup.php',
     'change_password.php' => 'change_password.php',
+    'admin_warden_password.php' => 'admin_warden_password.php',
     'student_lookup.php' => 'student_lookup.php',
     'my_leaves.php' => 'my_leaves.php',
     'submit_student_leave.php' => 'submit_student_leave.php',

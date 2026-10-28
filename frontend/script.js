@@ -451,6 +451,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loginIdInput.placeholder = isStudent ? '11-digit SAP ID' : 'Login ID';
     if (isStudent) loginIdInput.value = loginIdInput.value.replace(/\D/g, '').slice(0, 11);
     document.getElementById('student-forgot-password-button')?.classList.toggle('hidden', roleSelect.value !== 'student');
+    document.getElementById('student-forgot-password-button')?.setAttribute('aria-hidden', String(roleSelect.value !== 'student'));
     document.getElementById('student-signup-button')?.classList.toggle('hidden', roleSelect.value !== 'student');
     document.getElementById('student-auth-divider')?.classList.toggle('hidden', roleSelect.value !== 'student');
   }
@@ -1992,6 +1993,61 @@ document.addEventListener('DOMContentLoaded', () => {
     await load();
   }
 
+  async function setupAdminWardenPasswordReset() {
+    const form = document.getElementById('admin-warden-password-form');
+    if (!form) return;
+    const select = document.getElementById('admin-warden-account');
+    const message = document.getElementById('admin-warden-password-message');
+    const passwordResult = document.getElementById('admin-warden-temporary-password');
+    const loadWardens = async () => {
+      try {
+        const response = await fetch('/api/index.php?endpoint=admin_warden_password.php');
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Unable to load warden accounts.');
+        select.replaceChildren(...result.items.map(warden => {
+          const option = document.createElement('option');
+          option.value = warden.id;
+          option.textContent = `${warden.name} — ${warden.warden_hostel}`;
+          return option;
+        }));
+        form.querySelector('button[type="submit"]').disabled = result.items.length === 0;
+        if (!result.items.length) message.textContent = 'No active warden accounts are available.';
+      } catch (error) {
+        console.error(error);
+        message.textContent = error.message || 'Unable to load warden accounts.';
+        message.className = 'text-sm text-red-600';
+      }
+    };
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const button = form.querySelector('button[type="submit"]');
+      if (!select.value) return;
+      button.disabled = true;
+      passwordResult.classList.add('hidden');
+      message.textContent = 'Resetting password...';
+      message.className = 'text-sm text-gray-600';
+      try {
+        const response = await fetch('/api/index.php?endpoint=admin_warden_password.php', {
+          method: 'POST',
+          body: getCsrfFormData({ warden_user_id: select.value })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Unable to reset warden password.');
+        passwordResult.textContent = result.temporary_password;
+        passwordResult.classList.remove('hidden');
+        message.textContent = `${result.warden_name}'s temporary password is shown once. Share it securely; the warden must change it at next login.`;
+        message.className = 'text-sm text-green-700';
+      } catch (error) {
+        console.error(error);
+        message.textContent = error.message || 'Unable to reset warden password.';
+        message.className = 'text-sm text-red-600';
+      } finally {
+        button.disabled = false;
+      }
+    });
+    await loadWardens();
+  }
+
   async function setupAdminAnnouncements() {
     const form = document.getElementById('admin-announcement-form');
     const target = document.getElementById('admin-announcement-list');
@@ -2460,6 +2516,18 @@ document.addEventListener('DOMContentLoaded', () => {
           </form>
           <div id="admin-import-result" class="mt-4 hidden"></div>
         </section>
+        <section class="mt-6 rounded-xl border border-red-200 bg-white p-5 shadow-sm">
+          <h2 class="mb-2 text-xl font-semibold text-gray-800">Reset Warden Password</h2>
+          <p class="mb-4 text-sm text-gray-600">Reset an active warden's password if they can no longer sign in. A temporary password will be shown once, and the warden must replace it at their next login.</p>
+          <form id="admin-warden-password-form" class="grid gap-3 sm:grid-cols-[1fr_auto]">
+            <label class="text-sm font-medium text-gray-700">Warden account
+              <select id="admin-warden-account" required class="mt-1 w-full rounded-lg border border-gray-300 p-3"></select>
+            </label>
+            <button type="submit" disabled class="self-end rounded-lg bg-red-700 px-4 py-3 font-semibold text-white disabled:opacity-50">Reset password</button>
+            <p id="admin-warden-password-message" class="sm:col-span-2 text-sm" aria-live="polite"></p>
+            <p id="admin-warden-temporary-password" class="hidden sm:col-span-2 break-all rounded-lg border border-amber-300 bg-amber-50 p-3 font-mono text-lg font-bold text-amber-900 select-all" aria-live="polite"></p>
+          </form>
+        </section>
         <section class="mt-6 rounded-xl border border-amber-200 bg-white p-5 shadow-sm">
           <h2 class="mb-3 text-xl font-semibold text-gray-800">Optional Leave Policies</h2>
           <p class="mb-4 text-sm text-gray-600">Blank values do not restrict existing leave requests. Policies apply only to new submissions for the selected hostel.</p>
@@ -2561,6 +2629,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
     setupAdminPolicies();
+    setupAdminWardenPasswordReset();
     setupAdminAnnouncements();
   }
 

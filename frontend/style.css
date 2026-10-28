@@ -145,6 +145,10 @@ body.items-center {
     text-align: center;
 }
 
+#student-forgot-password-button.hidden {
+    display: none;
+}
+
 #student-signup-button {
     flex: 0 0 auto;
     white-space: nowrap;
