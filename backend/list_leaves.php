@@ -83,7 +83,24 @@ if ($search !== '') {
     $params[] = $term;
 }
 
-$sql = 'SELECT lr.id, lr.sap_id, s.name, s.gender, s.student_contact, s.course, s.year, s.branch, s.batch, s.parent_email, s.parent_contact, lr.room_no, lr.start_date, lr.start_time, lr.end_date, lr.end_time, lr.leave_days, lr.reason, lr.home_address, lr.school, lr.hostel, lr.status, lr.email_from, lr.parent_email_matched, lr.granted_by, lr.granted_at, lr.created_at FROM leave_requests lr INNER JOIN students s ON s.sap_id = lr.sap_id';
+$emergencyFields = 'NULL AS emergency_contact_name, NULL AS emergency_contact_relationship, NULL AS emergency_contact_phone';
+try {
+    $emergencyColumn = $pdo->prepare(
+        'SELECT 1 FROM information_schema.columns WHERE table_name = ? AND column_name = ? AND table_schema = ? LIMIT 1'
+    );
+    $emergencyColumn->execute([
+        'leave_requests',
+        'emergency_contact_name',
+        DB_DRIVER === 'pgsql' ? 'public' : DB_NAME,
+    ]);
+    if ($emergencyColumn->fetchColumn()) {
+        $emergencyFields = 'lr.emergency_contact_name, lr.emergency_contact_relationship, lr.emergency_contact_phone';
+    }
+} catch (Throwable $error) {
+    error_log('Unable to inspect optional emergency contact columns: ' . $error->getMessage());
+}
+
+$sql = 'SELECT lr.id, lr.sap_id, s.name, s.gender, s.student_contact, s.course, s.year, s.branch, s.batch, s.parent_email, s.parent_contact, lr.room_no, lr.start_date, lr.start_time, lr.end_date, lr.end_time, lr.leave_days, lr.reason, lr.home_address, lr.school, lr.hostel, lr.status, lr.email_from, lr.parent_email_matched, lr.granted_by, lr.granted_at, lr.created_at, ' . $emergencyFields . ' FROM leave_requests lr INNER JOIN students s ON s.sap_id = lr.sap_id';
 if (!empty($where)) {
     $sql .= ' WHERE ' . implode(' AND ', $where);
 }

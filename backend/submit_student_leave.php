@@ -24,6 +24,9 @@ $reason = trim((string)($_POST['reason'] ?? ''));
 $school = trim((string)($_POST['school'] ?? ''));
 $hostel = trim((string)($_POST['hostel'] ?? ''));
 $roomNo = trim((string)($_POST['room_no'] ?? ''));
+$emergencyName = trim((string)($_POST['emergency_contact_name'] ?? ''));
+$emergencyRelationship = trim((string)($_POST['emergency_contact_relationship'] ?? ''));
+$emergencyPhone = trim((string)($_POST['emergency_contact_phone'] ?? ''));
 $detailsConfirmed = ($_POST['details_confirmed'] ?? '') === '1';
 
 if ($sapId !== $user['login_id']) {
@@ -97,6 +100,17 @@ if ($roomNo === '' || strlen($roomNo) > 50) {
     echo json_encode(['success' => false, 'message' => 'Enter a room number of up to 50 characters.']);
     exit;
 }
+if (
+    strlen($emergencyName) > 150
+    || strlen($emergencyRelationship) > 50
+    || strlen($emergencyPhone) > 20
+    || (($emergencyName !== '' || $emergencyRelationship !== '' || $emergencyPhone !== '')
+        && ($emergencyName === '' || $emergencyPhone === '' || !preg_match('/^[0-9+() -]{7,20}$/', $emergencyPhone)))
+) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Enter a contact name and valid phone number; relationship is optional.']);
+    exit;
+}
 
 $studentStmt = $pdo->prepare('SELECT gender, course FROM students WHERE sap_id = ? AND is_active = TRUE LIMIT 1');
 $studentStmt->execute([$sapId]);
@@ -119,7 +133,61 @@ if ($school !== $expectedSchool || !in_array($hostel, $allowedHostels, true)) {
 
 $leaveDays = (int)$start->diff($end)->format('%a') + 1;
 try {
+    $emergencyColumn = $pdo->prepare(
+        'SELECT 1 FROM information_schema.columns WHERE table_name = ? AND column_name = ? AND table_schema = ? LIMIT 1'
+    );
+    $emergencyColumn->execute([
+        'leave_requests',
+        'emergency_contact_name',
+        DB_DRIVER === 'pgsql' ? 'public' : DB_NAME,
+    ]);
+    $hasEmergencyColumns = (bool)$emergencyColumn->fetchColumn();
+    if (!$hasEmergencyColumns && ($emergencyName !== '' || $emergencyRelationship !== '' || $emergencyPhone !== '')) {
+        http_response_code(503);
+        echo json_encode(['success' => false, 'message' => 'Emergency contact storage is not configured yet. Ask the administrator to apply the portal-features database migration.']);
+        exit;
+    }
+
     $pdo->beginTransaction();
+
+    $policyTable = $pdo->prepare(
+        'SELECT 1 FROM information_schema.tables WHERE table_name = ? AND table_schema = ? LIMIT 1'
+    );
+    $policyTable->execute(['leave_policies', DB_DRIVER === 'pgsql' ? 'public' : DB_NAME]);
+    if ($policyTable->fetchColumn()) {
+        $policyStmt = $pdo->prepare(
+            'SELECT max_leave_days, max_requests_per_month, minimum_notice_hours FROM leave_policies WHERE hostel = ? LIMIT 1'
+        );
+        $policyStmt->execute([$hostel]);
+        $policy = $policyStmt->fetch();
+        if ($policy) {
+            $policyMessage = '';
+            if ($policy['max_leave_days'] !== null && $leaveDays > (int)$policy['max_leave_days']) {
+                $policyMessage = 'This leave exceeds the maximum duration allowed for your hostel.';
+            } elseif (
+                $policy['minimum_notice_hours'] !== null
+                && ($startDateTime->getTimestamp() - (new DateTimeImmutable('now', $campusTimezone))->getTimestamp()) < ((int)$policy['minimum_notice_hours'] * 3600)
+            ) {
+                $policyMessage = 'This leave does not meet your hostel minimum notice period.';
+            } elseif ($policy['max_requests_per_month'] !== null) {
+                $monthStart = substr($startDate, 0, 7) . '-01';
+                $monthEnd = (new DateTimeImmutable($monthStart, $campusTimezone))->modify('+1 month')->format('Y-m-d');
+                $requestCount = $pdo->prepare(
+                    'SELECT COUNT(*) FROM leave_requests WHERE sap_id = ? AND start_date >= ? AND start_date < ? AND status NOT IN (?, ?)'
+                );
+                $requestCount->execute([$sapId, $monthStart, $monthEnd, 'Rejected', 'Cancelled']);
+                if ((int)$requestCount->fetchColumn() >= (int)$policy['max_requests_per_month']) {
+                    $policyMessage = 'You have reached the monthly leave request limit for your hostel.';
+                }
+            }
+            if ($policyMessage !== '') {
+                $pdo->rollBack();
+                http_response_code(422);
+                echo json_encode(['success' => false, 'message' => $policyMessage]);
+                exit;
+            }
+        }
+    }
 
     $overlap = $pdo->prepare('SELECT id FROM leave_requests WHERE sap_id = ? AND status NOT IN (\'Rejected\', \'Cancelled\', \'CHECKED_IN\') AND start_date <= ? AND end_date >= ? LIMIT 1');
     $overlap->execute([$sapId, $endDate, $startDate]);
@@ -133,24 +201,23 @@ try {
     $contactUpdate = $pdo->prepare('UPDATE students SET student_contact = ?, updated_at = NOW() WHERE sap_id = ? AND is_active = TRUE');
     $contactUpdate->execute(['+91' . $studentContact, $sapId]);
 
+    $emergencyColumns = $hasEmergencyColumns
+        ? ', emergency_contact_name, emergency_contact_relationship, emergency_contact_phone'
+        : '';
+    $emergencyValues = $hasEmergencyColumns ? ', ?, ?, ?' : '';
     $insertSql = DB_DRIVER === 'pgsql'
-        ? 'INSERT INTO leave_requests (sap_id, start_date, start_time, end_date, end_time, leave_days, reason, home_address, school, hostel, room_no, email_from, email_received_at, parent_email_matched, logged_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, FALSE, ?, \'Pending Verification\', NOW()) RETURNING id'
-        : 'INSERT INTO leave_requests (sap_id, start_date, start_time, end_date, end_time, leave_days, reason, home_address, school, hostel, room_no, email_from, email_received_at, parent_email_matched, logged_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 0, ?, \'Pending Verification\', NOW())';
+        ? 'INSERT INTO leave_requests (sap_id, start_date, start_time, end_date, end_time, leave_days, reason, home_address, school, hostel, room_no' . $emergencyColumns . ', email_from, email_received_at, parent_email_matched, logged_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?' . $emergencyValues . ', NULL, NULL, FALSE, ?, \'Pending Verification\', NOW()) RETURNING id'
+        : 'INSERT INTO leave_requests (sap_id, start_date, start_time, end_date, end_time, leave_days, reason, home_address, school, hostel, room_no' . $emergencyColumns . ', email_from, email_received_at, parent_email_matched, logged_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?' . $emergencyValues . ', NULL, NULL, 0, ?, \'Pending Verification\', NOW())';
+    $insertParams = [
+        $sapId, $startDate, $startTime, $endDate, $endTime, $leaveDays, $reason,
+        $homeAddress, $school, $hostel, $roomNo,
+    ];
+    if ($hasEmergencyColumns) {
+        array_push($insertParams, $emergencyName ?: null, $emergencyRelationship ?: null, $emergencyPhone ?: null);
+    }
+    $insertParams[] = (int)$user['id'];
     $insert = $pdo->prepare($insertSql);
-    $insert->execute([
-        $sapId,
-        $startDate,
-        $startTime,
-        $endDate,
-        $endTime,
-        $leaveDays,
-        $reason,
-        $homeAddress,
-        $school,
-        $hostel,
-        $roomNo,
-        (int)$user['id'],
-    ]);
+    $insert->execute($insertParams);
     $leaveId = DB_DRIVER === 'pgsql' ? (int)$insert->fetchColumn() : (int)$pdo->lastInsertId();
 
     writeAudit($pdo, (int)$user['id'], 'submit_student_leave', 'leave_requests', $leaveId, [

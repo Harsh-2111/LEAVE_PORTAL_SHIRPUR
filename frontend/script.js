@@ -535,6 +535,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function logoutUser() {
     await stopSecurityScanner();
+    if (window.notificationPollTimer) {
+      clearInterval(window.notificationPollTimer);
+      window.notificationPollTimer = null;
+    }
     if (wardenAttendanceTimer !== null) {
       clearInterval(wardenAttendanceTimer);
       wardenAttendanceTimer = null;
@@ -709,6 +713,18 @@ document.addEventListener('DOMContentLoaded', () => {
             <label class="block text-sm font-medium text-gray-700 md:col-span-2">Reason for leave
               <textarea id="student-leave-reason" rows="3" maxlength="2000" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg"></textarea>
             </label>
+            <fieldset class="md:col-span-2 grid gap-4 rounded-lg border border-gray-200 p-4 md:grid-cols-3">
+              <legend class="px-2 text-sm font-semibold text-gray-700">Emergency contact (optional)</legend>
+              <label class="block text-sm font-medium text-gray-700">Contact name
+                <input id="student-emergency-name" type="text" maxlength="150" class="mt-2 w-full rounded-lg border border-gray-300 p-3" />
+              </label>
+              <label class="block text-sm font-medium text-gray-700">Relationship
+                <input id="student-emergency-relationship" type="text" maxlength="50" class="mt-2 w-full rounded-lg border border-gray-300 p-3" placeholder="e.g. Mother" />
+              </label>
+              <label class="block text-sm font-medium text-gray-700">Phone number
+                <input id="student-emergency-phone" type="tel" inputmode="tel" maxlength="20" class="mt-2 w-full rounded-lg border border-gray-300 p-3" />
+              </label>
+            </fieldset>
             <label class="md:col-span-2 flex items-start gap-3 text-sm text-gray-700">
               <input id="student-details-confirmed" type="checkbox" required class="mt-1 h-5 w-5" />
               <span>I confirm that the details above are correct.</span>
@@ -722,6 +738,14 @@ document.addEventListener('DOMContentLoaded', () => {
         <section class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm mb-6">
           <h2 class="text-2xl font-semibold text-gray-700 mb-3">Your Leave History</h2>
           <div id="student-history-table"></div>
+        </section>
+        <section class="mb-6 rounded-xl border border-blue-200 bg-white p-5 shadow-sm">
+          <h2 class="mb-3 text-xl font-semibold text-gray-800">Hostel Announcements</h2>
+          <div id="student-announcements" aria-live="polite">Loading announcements...</div>
+        </section>
+        <section class="mb-6 rounded-xl border border-indigo-200 bg-white p-5 shadow-sm">
+          <h2 class="mb-3 text-xl font-semibold text-gray-800">Leave Calendar</h2>
+          <div id="student-leave-calendar" aria-live="polite">Loading calendar...</div>
         </section>
         <section class="bg-green-50 border border-green-200 rounded-xl p-5 shadow-sm">
           <h2 class="text-xl font-semibold text-green-800 mb-2">Gate Pass</h2>
@@ -858,6 +882,9 @@ document.addEventListener('DOMContentLoaded', () => {
         end_time: endTimeInput.value,
         home_address: document.getElementById('student-home-address').value.trim(),
         reason: document.getElementById('student-leave-reason').value.trim(),
+        emergency_contact_name: document.getElementById('student-emergency-name').value.trim(),
+        emergency_contact_relationship: document.getElementById('student-emergency-relationship').value.trim(),
+        emergency_contact_phone: document.getElementById('student-emergency-phone').value.trim(),
         school: schoolSelect.value,
         hostel: hostelSelect.value,
         room_no: document.getElementById('student-room-number').value.trim(),
@@ -876,6 +903,9 @@ document.addEventListener('DOMContentLoaded', () => {
           document.getElementById('student-home-address').value = '';
           document.getElementById('student-leave-reason').value = '';
           document.getElementById('student-room-number').value = '';
+          document.getElementById('student-emergency-name').value = '';
+          document.getElementById('student-emergency-relationship').value = '';
+          document.getElementById('student-emergency-phone').value = '';
           document.getElementById('student-details-confirmed').checked = false;
           updateLeaveDays();
           await loadStudentHistory();
@@ -889,6 +919,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     await loadStudentHistory();
     await setupNotifications('student');
+    void setupAnnouncements('student');
+    void loadLeaveCalendar('student');
   }
 
   async function handleChangePassword(event) {
@@ -966,14 +998,14 @@ document.addEventListener('DOMContentLoaded', () => {
             <thead class="bg-gray-200 text-gray-600 uppercase text-sm"><tr>
               <th class="py-3 px-4 text-left">From</th><th class="py-3 px-4 text-left">To</th><th class="py-3 px-4 text-left">Room</th><th class="py-3 px-4 text-left">Address</th>
               <th class="py-3 px-4 text-left">Days</th><th class="py-3 px-4 text-left">School / Hostel</th>
-              <th class="py-3 px-4 text-left">Reason</th><th class="py-3 px-4 text-left">Status</th><th class="py-3 px-4 text-left">Pass</th>
+              <th class="py-3 px-4 text-left">Reason</th><th class="py-3 px-4 text-left">Status</th><th class="py-3 px-4 text-left">Pass / Actions</th>
             </tr></thead>
             <tbody>${items.map(item => `
               <tr id="leave-${item.id}" class="border-b border-gray-200 hover:bg-gray-100">
                 <td class="py-3 px-4">${item.start_date} ${item.start_time || ''}</td><td class="py-3 px-4">${item.end_date} ${item.end_time || ''}</td><td class="py-3 px-4">${item.room_no || '-'}</td><td class="py-3 px-4">${escapeHtml(item.home_address || '-')}</td>
                 <td class="py-3 px-4">${item.leave_days}</td><td class="py-3 px-4">${item.school || '-'} / ${item.hostel || '-'}</td>
-                <td class="py-3 px-4">${item.reason}</td><td class="py-3 px-4">${item.status}</td>
-                <td class="py-3 px-4">${['Granted', 'CHECKED_OUT'].includes(item.status) && item.qr_code_data ? `<button type="button" class="bg-blue-600 text-white px-3 py-1 rounded" data-qrcode="${item.id}">View</button>` : '-'}</td>
+                <td class="py-3 px-4">${escapeHtml(item.reason)}</td><td class="py-3 px-4">${escapeHtml(item.status)}</td>
+                <td class="py-3 px-4"><div class="flex flex-wrap gap-2">${['Granted', 'CHECKED_OUT'].includes(item.status) && item.qr_code_data ? `<button type="button" class="bg-blue-600 text-white px-3 py-1 rounded" data-qrcode="${item.id}">View</button>` : ''}${['Pending Verification', 'Granted'].includes(item.status) ? `<button type="button" class="rounded bg-red-600 px-3 py-1 text-white" data-cancel-leave="${item.id}">Cancel</button>` : '-'}</div></td>
               </tr>`).join('')}</tbody>
           </table>
         </div>
@@ -982,6 +1014,25 @@ document.addEventListener('DOMContentLoaded', () => {
         button.addEventListener('click', () => {
           const pass = items.find(item => String(item.id) === button.dataset.qrcode);
           if (pass) renderGatePass(pass);
+        });
+      });
+      target.querySelectorAll('[data-cancel-leave]').forEach(button => {
+        button.addEventListener('click', async () => {
+          if (!window.confirm('Cancel this leave request? Any approved gate pass will be invalidated.')) return;
+          button.disabled = true;
+          try {
+            const response = await fetch('/api/index.php?endpoint=cancel_leave.php', {
+              method: 'POST',
+              body: getCsrfFormData({ leave_id: button.dataset.cancelLeave })
+            });
+            const cancellation = await response.json();
+            if (!response.ok || !cancellation.success) throw new Error(cancellation.message || 'Unable to cancel leave.');
+            await loadStudentHistory();
+          } catch (error) {
+            console.error(error);
+            window.alert(error.message || 'Unable to cancel leave.');
+            button.disabled = false;
+          }
         });
       });
       renderGatePass(items.find(item => ['Granted', 'CHECKED_OUT'].includes(item.status) && item.qr_code_data));
@@ -1159,6 +1210,14 @@ document.addEventListener('DOMContentLoaded', () => {
             <div id="warden-followup-list" class="overflow-x-auto" aria-live="polite">Open this section to load follow-up requests.</div>
           </div>
         </section>
+        <section class="mt-6 rounded-xl border border-blue-200 bg-white p-5 shadow-sm">
+          <h2 class="mb-3 text-xl font-semibold text-gray-800">Hostel Announcements</h2>
+          <div id="warden-announcements" aria-live="polite">Loading announcements...</div>
+        </section>
+        <section class="mt-6 rounded-xl border border-indigo-200 bg-white p-5 shadow-sm">
+          <h2 class="mb-3 text-xl font-semibold text-gray-800">Hostel Leave Calendar</h2>
+          <div id="warden-leave-calendar" aria-live="polite">Loading calendar...</div>
+        </section>
         <section class="bg-white rounded-xl p-5 border border-gray-200 shadow-sm mt-6">
           <h2 class="text-2xl font-semibold text-gray-700 mb-4">Daily Gate Attendance</h2>
           <div class="gate-attendance-controls mb-4">
@@ -1203,6 +1262,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 60000);
     document.getElementById('warden-download-approved-csv').addEventListener('click', downloadWardenApprovedCsv);
     void setupNotifications('warden');
+    void setupAnnouncements('warden');
+    void loadLeaveCalendar('warden');
   }
 
   async function loadWardenGateAttendance() {
@@ -1332,6 +1393,7 @@ document.addEventListener('DOMContentLoaded', () => {
           [`School / Hostel: ${item.school || '-'} / ${item.hostel || '-'}`, ''],
           [`Student mobile: ${item.student_contact || 'Not provided'}`, ''],
           [`Home address: ${item.home_address || 'Not provided'}`, ''],
+          [`Emergency contact: ${item.emergency_contact_name || 'Not provided'}${item.emergency_contact_relationship ? ` (${item.emergency_contact_relationship})` : ''} | ${item.emergency_contact_phone || 'Not provided'}`, ''],
           [`Reason: ${item.reason || '-'}`, ''],
           [`Call parent: ${item.parent_contact || 'Contact unavailable'} | ${item.parent_email || ''}`, '']
         ];
@@ -1614,7 +1676,7 @@ document.addEventListener('DOMContentLoaded', () => {
       table.className = 'min-w-full border border-gray-300 text-sm';
       const columns = [
         ['SAP ID', 'sap_id'], ['Student', 'name'], ['Dates', 'dates'], ['Days', 'leave_days'],
-        ['School / Hostel', 'location'], ['Reason', 'reason'], ['Approved on', 'granted_at']
+        ['School / Hostel', 'location'], ['Emergency contact', 'emergency'], ['Reason', 'reason'], ['Approved on', 'granted_at']
       ];
       const head = document.createElement('thead');
       head.className = 'bg-gray-100 text-gray-700';
@@ -1638,6 +1700,7 @@ document.addEventListener('DOMContentLoaded', () => {
           dates: `${item.start_date} ${item.start_time || ''} to ${item.end_date} ${item.end_time || ''}`,
           leave_days: item.leave_days,
           location: `${item.school || '-'} / ${item.hostel || '-'}`,
+          emergency: [item.emergency_contact_name, item.emergency_contact_relationship, item.emergency_contact_phone].filter(Boolean).join(' · ') || '-',
           reason: item.reason,
           granted_at: item.granted_at
         };
@@ -1711,6 +1774,253 @@ document.addEventListener('DOMContentLoaded', () => {
     } finally {
       button.disabled = state.wardenApprovedTotal === 0;
       button.textContent = originalText;
+    }
+  }
+
+  async function setupAnnouncements(role) {
+    const target = document.getElementById(`${role}-announcements`);
+    if (!target) return;
+    try {
+      const response = await fetch('/api/index.php?endpoint=announcements.php');
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || 'Unable to load announcements.');
+      const items = result.items || [];
+      if (!items.length) {
+        target.textContent = 'No current announcements.';
+        return;
+      }
+      target.replaceChildren(...items.map(item => {
+        const article = document.createElement('article');
+        article.className = 'mb-3 rounded-lg border border-blue-100 bg-blue-50 p-4';
+        const title = document.createElement('h3');
+        title.className = 'font-semibold text-gray-900';
+        title.textContent = item.title;
+        const body = document.createElement('p');
+        body.className = 'mt-1 whitespace-pre-wrap text-sm text-gray-700';
+        body.textContent = item.body;
+        const created = document.createElement('small');
+        created.className = 'mt-2 block text-gray-500';
+        created.textContent = new Date(item.created_at).toLocaleString();
+        article.append(title, body, created);
+        return article;
+      }));
+    } catch (error) {
+      console.error(error);
+      target.textContent = error.message || 'Unable to load announcements.';
+      target.className = 'text-sm text-red-600';
+    }
+  }
+
+  async function loadLeaveCalendar(role) {
+    const target = document.getElementById(`${role}-leave-calendar`);
+    if (!target) return;
+    const from = new Date();
+    const to = new Date(from.getFullYear(), from.getMonth() + 2, 0);
+    const formatDate = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const params = new URLSearchParams({ from: formatDate(from), to: formatDate(to) });
+    try {
+      const response = await fetch(`/api/index.php?endpoint=leave_calendar.php&${params.toString()}`);
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || 'Unable to load leave calendar.');
+      const items = result.items || [];
+      if (!items.length) {
+        target.textContent = 'No active leave requests in this calendar range.';
+        return;
+      }
+      const table = document.createElement('table');
+      table.className = 'min-w-full border border-gray-200 text-sm';
+      const head = document.createElement('thead');
+      head.className = 'bg-gray-100 text-left';
+      const headerRow = document.createElement('tr');
+      (role === 'student' ? ['From', 'To', 'Status'] : ['Student', 'SAP ID', 'From', 'To', 'Hostel', 'Overlapping leaves', 'Status']).forEach(label => {
+        const th = document.createElement('th');
+        th.className = 'whitespace-nowrap px-3 py-2';
+        th.textContent = label;
+        headerRow.appendChild(th);
+      });
+      head.appendChild(headerRow);
+      table.appendChild(head);
+      const body = document.createElement('tbody');
+      items.forEach(item => {
+        const row = document.createElement('tr');
+        row.className = 'border-t border-gray-200';
+        const values = role === 'student'
+          ? [item.start_date, item.end_date, item.status]
+          : [item.name, item.sap_id, item.start_date, item.end_date, item.hostel, Number(item.overlap_count) > 0 ? `${item.overlap_count} overlapping request(s)` : 'No overlap', item.status];
+        values.forEach(value => {
+          const cell = document.createElement('td');
+          cell.className = 'whitespace-nowrap px-3 py-2';
+          cell.textContent = value || '-';
+          row.appendChild(cell);
+        });
+        body.appendChild(row);
+      });
+      table.appendChild(body);
+      target.replaceChildren(table);
+    } catch (error) {
+      console.error(error);
+      target.textContent = error.message || 'Unable to load leave calendar.';
+      target.className = 'overflow-x-auto text-sm text-red-600';
+    }
+  }
+
+  async function setupAdminPolicies() {
+    const form = document.getElementById('admin-leave-policy-form');
+    if (!form) return;
+    const fields = ['max_leave_days', 'max_requests_per_month', 'minimum_notice_hours'];
+    const message = document.getElementById('admin-policy-message');
+    const load = async () => {
+      try {
+        const params = new URLSearchParams({ hostel: form.elements.hostel.value });
+        const response = await fetch(`/api/index.php?endpoint=leave_policies.php&${params.toString()}`);
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Unable to load leave policy.');
+        fields.forEach(field => { form.elements[field].value = result.items[0]?.[field] ?? ''; });
+        message.textContent = '';
+      } catch (error) {
+        message.textContent = error.message || 'Unable to load leave policy.';
+        message.className = 'ml-3 text-sm text-red-600';
+      }
+    };
+    form.elements.hostel.addEventListener('change', load);
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(form).entries());
+      try {
+        const response = await fetch('/api/index.php?endpoint=leave_policies.php', { method: 'POST', body: getCsrfFormData(data) });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Unable to save leave policy.');
+        message.textContent = result.message;
+        message.className = 'ml-3 text-sm text-green-700';
+      } catch (error) {
+        message.textContent = error.message || 'Unable to save leave policy.';
+        message.className = 'ml-3 text-sm text-red-600';
+      }
+    });
+    await load();
+  }
+
+  async function setupAdminAnnouncements() {
+    const form = document.getElementById('admin-announcement-form');
+    const target = document.getElementById('admin-announcement-list');
+    if (!form || !target) return;
+    const message = document.getElementById('admin-announcement-message');
+    const load = async () => {
+      try {
+        const response = await fetch('/api/index.php?endpoint=announcements.php');
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Unable to load announcements.');
+        if (!result.items.length) {
+          target.textContent = 'No current announcements.';
+          return;
+        }
+        target.replaceChildren(...result.items.map(item => {
+          const article = document.createElement('article');
+          article.className = 'flex flex-wrap items-start justify-between gap-3 rounded-lg border border-gray-200 p-3';
+          const copy = document.createElement('div');
+          const title = document.createElement('strong');
+          title.textContent = item.title;
+          const body = document.createElement('p');
+          body.className = 'whitespace-pre-wrap text-sm text-gray-700';
+          body.textContent = `${item.body} · ${item.target_role}${item.target_hostel ? ` · ${item.target_hostel}` : ''}`;
+          copy.append(title, body);
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.className = 'rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white';
+          remove.textContent = 'Delete';
+          remove.addEventListener('click', async () => {
+            try {
+              const response = await fetch('/api/index.php?endpoint=announcements.php', {
+                method: 'POST',
+                body: getCsrfFormData({ action: 'delete', id: item.id })
+              });
+              const result = await response.json();
+              if (!response.ok || !result.success) throw new Error(result.message || 'Unable to delete announcement.');
+              await load();
+            } catch (error) {
+              window.alert(error.message || 'Unable to delete announcement.');
+            }
+          });
+          article.append(copy, remove);
+          return article;
+        }));
+      } catch (error) {
+        console.error(error);
+        target.textContent = error.message || 'Unable to load announcements.';
+        target.className = 'mt-4 text-sm text-red-600';
+      }
+    };
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const values = Object.fromEntries(new FormData(form).entries());
+      try {
+        const response = await fetch('/api/index.php?endpoint=announcements.php', { method: 'POST', body: getCsrfFormData(values) });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Unable to publish announcement.');
+        message.textContent = result.message;
+        message.className = 'text-sm text-green-700';
+        form.reset();
+        await load();
+      } catch (error) {
+        message.textContent = error.message || 'Unable to publish announcement.';
+        message.className = 'text-sm text-red-600';
+      }
+    });
+    await load();
+  }
+
+  async function loadAdminAuditHistory() {
+    const target = document.getElementById('admin-audit-history');
+    if (!target) return;
+    const filter = document.getElementById('admin-audit-filter');
+    const refresh = document.getElementById('admin-audit-refresh');
+    if (refresh && !refresh.dataset.bound) {
+      refresh.dataset.bound = '1';
+      refresh.addEventListener('click', loadAdminAuditHistory);
+    }
+    const params = new URLSearchParams({ limit: '50' });
+    if (filter?.value.trim()) params.set('action', filter.value.trim());
+    target.textContent = 'Loading audit history...';
+    try {
+      const response = await fetch(`/api/index.php?endpoint=audit_history.php&${params.toString()}`);
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || 'Unable to load audit history.');
+      if (!result.items.length) {
+        target.textContent = 'No audit events found.';
+        return;
+      }
+      const table = document.createElement('table');
+      table.className = 'min-w-full border border-gray-200 text-sm';
+      const headings = ['When', 'Actor', 'Role', 'Action', 'Entity', 'Details'];
+      const thead = document.createElement('thead');
+      thead.className = 'bg-gray-100 text-left';
+      const headerRow = document.createElement('tr');
+      headings.forEach(label => {
+        const cell = document.createElement('th');
+        cell.className = 'whitespace-nowrap px-3 py-2';
+        cell.textContent = label;
+        headerRow.appendChild(cell);
+      });
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+      const tbody = document.createElement('tbody');
+      result.items.forEach(item => {
+        const row = document.createElement('tr');
+        row.className = 'border-t border-gray-200';
+        [new Date(item.created_at).toLocaleString(), item.actor_name, item.actor_role, item.action, `${item.entity}${item.entity_id ? ` #${item.entity_id}` : ''}`, typeof item.details === 'string' ? item.details : JSON.stringify(item.details || {})].forEach(value => {
+          const cell = document.createElement('td');
+          cell.className = 'max-w-sm break-words px-3 py-2';
+          cell.textContent = value || '-';
+          row.appendChild(cell);
+        });
+        tbody.appendChild(row);
+      });
+      table.appendChild(tbody);
+      target.replaceChildren(table);
+    } catch (error) {
+      console.error(error);
+      target.textContent = error.message || 'Unable to load audit history.';
+      target.className = 'overflow-x-auto text-sm text-red-600';
     }
   }
 
@@ -2094,6 +2404,47 @@ document.addEventListener('DOMContentLoaded', () => {
           </form>
           <div id="admin-import-result" class="mt-4 hidden"></div>
         </section>
+        <section class="mt-6 rounded-xl border border-amber-200 bg-white p-5 shadow-sm">
+          <h2 class="mb-3 text-xl font-semibold text-gray-800">Optional Leave Policies</h2>
+          <p class="mb-4 text-sm text-gray-600">Blank values do not restrict existing leave requests. Policies apply only to new submissions for the selected hostel.</p>
+          <form id="admin-leave-policy-form" class="grid gap-3 md:grid-cols-2">
+            <label class="text-sm font-medium text-gray-700">Hostel
+              <select name="hostel" class="mt-1 w-full rounded-lg border border-gray-300 p-3">
+                <option>BOYS HOSTEL 1</option><option>NEW BOYS HOSTEL</option><option>NEW GIRLS HOSTEL</option><option>OLD GIRLS HOSTEL</option>
+              </select>
+            </label>
+            <label class="text-sm font-medium text-gray-700">Maximum leave days
+              <input name="max_leave_days" type="number" min="1" max="3650" class="mt-1 w-full rounded-lg border border-gray-300 p-3" />
+            </label>
+            <label class="text-sm font-medium text-gray-700">Maximum requests per month
+              <input name="max_requests_per_month" type="number" min="1" max="3650" class="mt-1 w-full rounded-lg border border-gray-300 p-3" />
+            </label>
+            <label class="text-sm font-medium text-gray-700">Minimum notice (hours)
+              <input name="minimum_notice_hours" type="number" min="0" max="3650" class="mt-1 w-full rounded-lg border border-gray-300 p-3" />
+            </label>
+            <div class="md:col-span-2"><button type="submit" class="rounded-lg bg-amber-600 px-4 py-2 font-semibold text-white">Save policy</button><span id="admin-policy-message" class="ml-3 text-sm" aria-live="polite"></span></div>
+          </form>
+        </section>
+        <section class="mt-6 rounded-xl border border-blue-200 bg-white p-5 shadow-sm">
+          <h2 class="mb-3 text-xl font-semibold text-gray-800">Announcements</h2>
+          <form id="admin-announcement-form" class="grid gap-3">
+            <input name="title" maxlength="150" required class="rounded-lg border border-gray-300 p-3" placeholder="Announcement title" />
+            <textarea name="body" maxlength="5000" rows="3" required class="rounded-lg border border-gray-300 p-3" placeholder="Message"></textarea>
+            <div class="grid gap-3 md:grid-cols-3">
+              <select name="target_role" class="rounded-lg border border-gray-300 p-3"><option value="all">Everyone</option><option value="student">Students</option><option value="warden">Wardens</option></select>
+              <select name="target_hostel" class="rounded-lg border border-gray-300 p-3"><option value="">All hostels</option><option>BOYS HOSTEL 1</option><option>NEW BOYS HOSTEL</option><option>NEW GIRLS HOSTEL</option><option>OLD GIRLS HOSTEL</option></select>
+              <input name="expires_at" type="datetime-local" class="rounded-lg border border-gray-300 p-3" aria-label="Announcement expiry (optional)" />
+            </div>
+            <button type="submit" class="w-fit rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white">Publish announcement</button>
+            <p id="admin-announcement-message" class="text-sm" aria-live="polite"></p>
+          </form>
+          <div id="admin-announcement-list" class="mt-4 space-y-3">Loading announcements...</div>
+        </section>
+        <section class="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <h2 class="mb-3 text-xl font-semibold text-gray-800">Audit History</h2>
+          <div class="mb-3 flex flex-wrap gap-2"><input id="admin-audit-filter" class="rounded-lg border border-gray-300 p-2" placeholder="Filter action" /><button id="admin-audit-refresh" type="button" class="rounded-lg bg-gray-700 px-4 py-2 text-white">Refresh</button></div>
+          <div id="admin-audit-history" class="overflow-x-auto">Loading audit history...</div>
+        </section>
       </div>
     `;
     document.getElementById('student-import-form').addEventListener('submit', async event => {
@@ -2158,6 +2509,9 @@ document.addEventListener('DOMContentLoaded', () => {
         submitButton.textContent = 'Import Students';
       }
     });
+    setupAdminPolicies();
+    setupAdminAnnouncements();
+    loadAdminAuditHistory();
   }
 
   loginForm.addEventListener('submit', event => {

@@ -2,6 +2,7 @@
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/notifications.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -19,35 +20,66 @@ if ($leaveId <= 0) {
     exit;
 }
 
-$stmt = $pdo->prepare('SELECT * FROM leave_requests WHERE id = ? LIMIT 1');
-$stmt->execute([$leaveId]);
-$leave = $stmt->fetch();
-if (!$leave) {
-    http_response_code(404);
-    echo json_encode(['success' => false, 'message' => 'Leave request not found.']);
-    exit;
+try {
+    $pdo->beginTransaction();
+    $stmt = $pdo->prepare(
+        'SELECT lr.*, s.gender FROM leave_requests lr '
+        . 'INNER JOIN students s ON s.sap_id = lr.sap_id WHERE lr.id = ? LIMIT 1 FOR UPDATE'
+    );
+    $stmt->execute([$leaveId]);
+    $leave = $stmt->fetch();
+    if (!$leave) {
+        $pdo->rollBack();
+        http_response_code(404);
+        echo json_encode(['success' => false, 'message' => 'Leave request not found.']);
+        exit;
+    }
+
+    if ($user['role'] === 'student' && $leave['sap_id'] !== $user['login_id']) {
+        $pdo->rollBack();
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Students can only cancel their own requests.']);
+        exit;
+    }
+    if ($user['role'] === 'warden' && (
+        ($user['warden_gender'] ?? '') !== $leave['gender']
+        || requireWardenHostel($user) !== $leave['hostel']
+    )) {
+        $pdo->rollBack();
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'This leave belongs to another hostel warden.']);
+        exit;
+    }
+    if (!in_array($leave['status'], ['Pending Verification', 'Granted'], true) || $leave['gate_out_time'] !== null) {
+        $pdo->rollBack();
+        http_response_code(409);
+        echo json_encode(['success' => false, 'message' => 'Only pending or approved leaves can be cancelled before gate exit.']);
+        exit;
+    }
+
+    $update = $pdo->prepare(
+        'UPDATE leave_requests SET status = ?, pass_token = NULL, qr_code_data = NULL '
+        . 'WHERE id = ? AND status = ? AND gate_out_time IS NULL'
+    );
+    $update->execute(['Cancelled', $leaveId, $leave['status']]);
+    if ($update->rowCount() !== 1) {
+        throw new RuntimeException('Leave changed while cancellation was being recorded.');
+    }
+    writeAudit($pdo, (int)$user['id'], 'cancel_leave', 'leave_requests', $leaveId, [
+        'previous_status' => $leave['status'],
+        'status' => 'Cancelled',
+    ], $_SERVER['REMOTE_ADDR'] ?? null);
+    $pdo->commit();
+
+    try {
+        notifyLeave($pdo, $leaveId, 'leave_cancelled', 'Leave cancelled', 'The leave request was cancelled before gate exit.');
+    } catch (Throwable $notificationError) {
+        error_log('Unable to create cancellation notification: ' . $notificationError->getMessage());
+    }
+    echo json_encode(['success' => true, 'message' => 'Leave request cancelled.']);
+} catch (Throwable $error) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    error_log('Unable to cancel leave request: ' . $error->getMessage());
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Unable to cancel this leave request. Please try again.']);
 }
-
-if ($user['role'] === 'student' && $leave['sap_id'] !== $user['login_id']) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Students can only cancel their own requests.']);
-    exit;
-}
-
-if ($leave['gate_out_time'] !== null || in_array($leave['status'], ['CHECKED_OUT', 'CHECKED_IN'], true)) {
-    http_response_code(409);
-    echo json_encode(['success' => false, 'message' => 'A leave request cannot be cancelled after a gate exit has been recorded.']);
-    exit;
-}
-
-$update = $pdo->prepare('UPDATE leave_requests SET status = \'Cancelled\' WHERE id = ? AND gate_out_time IS NULL AND status NOT IN (\'CHECKED_OUT\', \'CHECKED_IN\')');
-$update->execute([$leaveId]);
-if ($update->rowCount() !== 1) {
-    http_response_code(409);
-    echo json_encode(['success' => false, 'message' => 'This leave request can no longer be cancelled.']);
-    exit;
-}
-
-writeAudit($pdo, (int)$user['id'], 'cancel_leave', 'leave_requests', $leaveId, ['status' => 'Cancelled'], $_SERVER['REMOTE_ADDR'] ?? null);
-
-echo json_encode(['success' => true, 'message' => 'Leave request cancelled.']);

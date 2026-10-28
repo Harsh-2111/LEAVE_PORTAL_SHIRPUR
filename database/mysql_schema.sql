@@ -3,6 +3,8 @@ USE `hostel_leave`;
 
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS `audit_log`;
+DROP TABLE IF EXISTS `announcements`;
+DROP TABLE IF EXISTS `leave_policies`;
 DROP TABLE IF EXISTS `leave_call_log`;
 DROP TABLE IF EXISTS `leave_requests`;
 DROP TABLE IF EXISTS `users`;
@@ -62,6 +64,9 @@ CREATE TABLE `leave_requests` (
   `school` ENUM('MPSTME','SPTM') DEFAULT NULL,
   `hostel` VARCHAR(40) DEFAULT NULL,
   `room_no` VARCHAR(50) DEFAULT NULL,
+  `emergency_contact_name` VARCHAR(150) DEFAULT NULL,
+  `emergency_contact_relationship` VARCHAR(50) DEFAULT NULL,
+  `emergency_contact_phone` VARCHAR(20) DEFAULT NULL,
   `email_from` VARCHAR(255) DEFAULT NULL,
   `email_received_at` DATETIME DEFAULT NULL,
   `parent_email_matched` TINYINT(1) NOT NULL DEFAULT 0,
@@ -86,6 +91,31 @@ CREATE TABLE `leave_requests` (
   KEY `idx_leave_requests_status_gate_times` (`status`, `gate_out_time`, `gate_in_time`),
   CONSTRAINT `fk_leave_requests_student` FOREIGN KEY (`sap_id`) REFERENCES `students` (`sap_id`) ON UPDATE CASCADE,
   CONSTRAINT `fk_leave_requests_logged_by` FOREIGN KEY (`logged_by`) REFERENCES `users` (`id`) ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `leave_policies` (
+  `hostel` VARCHAR(40) NOT NULL,
+  `max_leave_days` INT NULL,
+  `max_requests_per_month` INT NULL,
+  `minimum_notice_hours` INT NULL,
+  `updated_by` BIGINT UNSIGNED NULL,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`hostel`),
+  CONSTRAINT `fk_leave_policy_user` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `announcements` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `title` VARCHAR(150) NOT NULL,
+  `body` TEXT NOT NULL,
+  `target_role` VARCHAR(20) NOT NULL DEFAULT 'all',
+  `target_hostel` VARCHAR(40) NULL,
+  `expires_at` DATETIME NULL,
+  `created_by` BIGINT UNSIGNED NOT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_announcements_active` (`created_at`, `expires_at`),
+  CONSTRAINT `fk_announcement_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `leave_call_log` (

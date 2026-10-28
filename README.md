@@ -74,6 +74,12 @@ Vercel runs the protected leave-history cleanup at 00:00 UTC on the first day of
 
 Do not use the direct database host if it is unreachable from Vercel, and do not use any placeholder values from `.env.example` as production credentials. Keep database passwords and QR secrets in Vercel, not in Git or chat. Local Docker continues using MySQL by default; set `DB_DRIVER=mysql` there.
 
+## Optional portal features
+
+For an existing Supabase deployment, run `database/migration_portal_features_postgres.sql` once in the Supabase SQL Editor before using emergency-contact fields, leave-policy configuration, or announcements. The migration is additive and preserves existing requests. Leave policies are unrestricted until an administrator configures a limit. The migration has a MySQL counterpart for existing local MySQL databases.
+
+Students can cancel their own pending or approved leave requests before gate exit. Admins can view audit history, manage announcements, and configure optional hostel policies. Students and wardens can view announcements and a read-only leave calendar. Overdue-return notifications are generated when a relevant student or warden portal checks notifications; no external email or SMS service is used.
+
 ## Demo accounts
 
 Choose the matching role on the login screen:
