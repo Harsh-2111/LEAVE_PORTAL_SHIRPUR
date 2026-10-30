@@ -18,6 +18,15 @@ body {
     justify-content: center;
 }
 
+body.session-restoring {
+    background-image: none;
+    background-color: #f3f4f6;
+}
+
+body.session-restoring #app-container {
+    visibility: hidden;
+}
+
 body.items-center {
     align-items: flex-start;
 }

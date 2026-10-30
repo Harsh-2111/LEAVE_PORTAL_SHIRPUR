@@ -569,19 +569,29 @@ document.addEventListener('DOMContentLoaded', () => {
   async function restoreSession() {
     try {
       const response = await fetch('/api/index.php?endpoint=session.php', { cache: 'no-store' });
-      if (!response.ok) return;
+      if (!response.ok) {
+        showLogin();
+        return;
+      }
       const result = await response.json();
-      if (!result.success || !result.user) return;
+      if (!result.success || !result.user) {
+        showLogin();
+        return;
+      }
 
       state.user = result.user;
       state.csrfToken = result.csrf_token || '';
       if (state.user.must_change_password) {
+        showLogin();
         openChangePasswordModal();
         return;
       }
       await showAuthenticatedPortal();
     } catch (error) {
       console.warn('Unable to restore the current session.', error);
+      showLogin();
+    } finally {
+      document.body.classList.remove('session-restoring');
     }
   }
 
@@ -2825,6 +2835,5 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('confirm-logout').addEventListener('click', logoutUser);
   document.getElementById('cancel-logout').addEventListener('click', () => logoutModal.classList.add('hidden'));
   updateRoleTitle();
-  showLogin();
-  restoreSession();
+  void restoreSession();
 });
