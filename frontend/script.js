@@ -198,6 +198,31 @@ document.addEventListener('DOMContentLoaded', () => {
     if (text) text.textContent = '100%';
   }
 
+  function studentTimeInputMarkup(id) {
+    const hours = Array.from({ length: 12 }, (_, index) => {
+      const hour = String(index + 1).padStart(2, '0');
+      return `<option value="${hour}">${hour}</option>`;
+    }).join('');
+    const minutes = Array.from({ length: 60 }, (_, index) => {
+      const minute = String(index).padStart(2, '0');
+      return `<option value="${minute}">${minute}</option>`;
+    }).join('');
+    return `
+      <span class="mt-2 grid w-full grid-cols-3 gap-2">
+        <select id="${id}-hour" required aria-label="Hour" class="min-w-0 rounded-lg border border-gray-300 bg-white p-3">
+          <option value="">Hour</option>${hours}
+        </select>
+        <select id="${id}-minute" required aria-label="Minute" class="min-w-0 rounded-lg border border-gray-300 bg-white p-3">
+          <option value="">Minute</option>${minutes}
+        </select>
+        <select id="${id}-period" required aria-label="AM or PM" class="min-w-0 rounded-lg border border-gray-300 bg-white p-3">
+          <option value="">AM/PM</option><option value="AM">AM</option><option value="PM">PM</option>
+        </select>
+      </span>
+      <input id="${id}" type="hidden" />
+    `;
+  }
+
   async function handleSignupVerification(event) {
     event.preventDefault();
     const button = document.getElementById('verify-signup-button');
@@ -804,13 +829,13 @@ document.addEventListener('DOMContentLoaded', () => {
               <span class="mt-1 block text-xs text-gray-500">Leave start dates can be selected up to 5 days ahead.</span>
             </label>
             <label class="block text-sm font-medium text-gray-700">Leave from time
-              <input id="student-leave-start-time" type="time" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg" />
+              ${studentTimeInputMarkup('student-leave-start-time')}
             </label>
             <label class="block text-sm font-medium text-gray-700">Return date
               <input id="student-leave-end" type="date" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg" />
             </label>
             <label class="block text-sm font-medium text-gray-700">Return time
-              <input id="student-leave-end-time" type="time" required class="mt-2 w-full p-3 border border-gray-300 rounded-lg" />
+              ${studentTimeInputMarkup('student-leave-end-time')}
             </label>
             <p id="student-leave-days" class="md:col-span-2 text-sm text-gray-600" aria-live="polite">Select both dates to see the number of leave days.</p>
             <label class="block text-sm font-medium text-gray-700 md:col-span-2">Home address
@@ -872,6 +897,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitButton = document.getElementById('student-submit-leave');
     const profileDisplayName = document.getElementById('student-profile-display-name');
     const profileIcon = document.getElementById('student-profile-icon');
+    const initializeTimePicker = inputId => {
+      const timeInput = document.getElementById(inputId);
+      const hourSelect = document.getElementById(`${inputId}-hour`);
+      const minuteSelect = document.getElementById(`${inputId}-minute`);
+      const periodSelect = document.getElementById(`${inputId}-period`);
+      const updateTime = () => {
+        if (!hourSelect.value || !minuteSelect.value || !periodSelect.value) {
+          timeInput.value = '';
+        } else {
+          const hour12 = Number(hourSelect.value);
+          const hour24 = (hour12 % 12) + (periodSelect.value === 'PM' ? 12 : 0);
+          timeInput.value = `${String(hour24).padStart(2, '0')}:${minuteSelect.value}`;
+        }
+        timeInput.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+      [hourSelect, minuteSelect, periodSelect].forEach(select => {
+        select.addEventListener('change', updateTime);
+      });
+      return () => {
+        hourSelect.value = '';
+        minuteSelect.value = '';
+        periodSelect.value = '';
+        timeInput.value = '';
+      };
+    };
+    const resetStartTimePicker = initializeTimePicker('student-leave-start-time');
+    const resetEndTimePicker = initializeTimePicker('student-leave-end-time');
     profileDisplayName.textContent = state.user.name || 'Student';
     const now = new Date();
     const campusDateParts = new Intl.DateTimeFormat('en-US', {
@@ -1029,8 +1081,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (result.success) {
           startInput.value = '';
           endInput.value = '';
-          startTimeInput.value = '';
-          endTimeInput.value = '';
+          resetStartTimePicker();
+          resetEndTimePicker();
           document.getElementById('student-home-address').value = '';
           document.getElementById('student-leave-reason').value = '';
           document.getElementById('student-room-number').value = '';
