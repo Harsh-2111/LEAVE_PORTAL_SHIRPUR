@@ -106,7 +106,7 @@ try {
     error_log('Unable to inspect optional emergency contact columns: ' . $error->getMessage());
 }
 
-$sql = 'SELECT lr.id, lr.sap_id, s.name, s.gender, s.student_contact, s.course, s.year, s.branch, s.batch, s.parent_email, s.parent_contact, lr.room_no, lr.start_date, lr.start_time, lr.end_date, lr.end_time, lr.leave_days, lr.reason, lr.home_address, lr.school, lr.hostel, lr.status, lr.email_from, lr.parent_email_matched, lr.granted_by, lr.granted_at, lr.created_at, ' . $emergencyFields . ' FROM leave_requests lr INNER JOIN students s ON s.sap_id = lr.sap_id';
+$sql = 'SELECT lr.id, lr.sap_id, s.name, s.gender, s.student_contact, s.course, s.year, s.branch, s.batch, s.parent_email, s.parent_contact, lr.room_no, lr.start_date, lr.start_time, lr.end_date, lr.end_time, lr.leave_days, lr.reason, lr.home_address, lr.school, lr.hostel, lr.status, lr.gate_out_time, lr.email_from, lr.parent_email_matched, lr.granted_by, lr.granted_at, lr.created_at, ' . $emergencyFields . ' FROM leave_requests lr INNER JOIN students s ON s.sap_id = lr.sap_id';
 if (!empty($where)) {
     $sql .= ' WHERE ' . implode(' AND ', $where);
 }

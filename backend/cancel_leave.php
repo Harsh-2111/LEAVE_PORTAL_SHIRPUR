@@ -50,10 +50,24 @@ try {
         echo json_encode(['success' => false, 'message' => 'This leave belongs to another hostel warden.']);
         exit;
     }
+    if ($user['role'] === 'warden' && $leave['status'] !== 'Granted') {
+        $pdo->rollBack();
+        http_response_code(409);
+        echo json_encode(['success' => false, 'message' => 'Wardens can cancel approved leaves only.']);
+        exit;
+    }
     if (!in_array($leave['status'], ['Pending Verification', 'Granted'], true) || $leave['gate_out_time'] !== null) {
         $pdo->rollBack();
         http_response_code(409);
-        echo json_encode(['success' => false, 'message' => 'Only pending or approved leaves can be cancelled before gate exit.']);
+        echo json_encode(['success' => false, 'message' => 'Only pending or approved leaves can be cancelled before the leave starts.']);
+        exit;
+    }
+    $campusTimezone = new DateTimeZone('Asia/Kolkata');
+    $scheduledStart = new DateTimeImmutable((string)$leave['start_date'], $campusTimezone);
+    if (new DateTimeImmutable('now', $campusTimezone) >= $scheduledStart) {
+        $pdo->rollBack();
+        http_response_code(409);
+        echo json_encode(['success' => false, 'message' => 'This leave can no longer be cancelled because its start date has arrived.']);
         exit;
     }
 
@@ -72,7 +86,7 @@ try {
     $pdo->commit();
 
     try {
-        notifyLeave($pdo, $leaveId, 'leave_cancelled', 'Leave cancelled', 'The leave request was cancelled before gate exit.');
+        notifyLeave($pdo, $leaveId, 'leave_cancelled', 'Leave cancelled', 'The leave request was cancelled before its start date.');
     } catch (Throwable $notificationError) {
         error_log('Unable to create cancellation notification: ' . $notificationError->getMessage());
     }

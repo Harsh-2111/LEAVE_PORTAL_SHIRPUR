@@ -68,6 +68,11 @@ document.addEventListener('DOMContentLoaded', () => {
     })[character]);
   }
 
+  function leaveStartIsFuture(item) {
+    const scheduledStart = new Date(`${item.start_date}T00:00:00+05:30`);
+    return !Number.isNaN(scheduledStart.getTime()) && scheduledStart > new Date();
+  }
+
   function openChangePasswordModal() {
     if (!changePasswordModal) return;
     const form = document.getElementById('change-password-form');
@@ -1198,7 +1203,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td class="py-3 px-4">${item.start_date} ${item.start_time || ''}</td><td class="py-3 px-4">${item.end_date} ${item.end_time || ''}</td><td class="py-3 px-4">${item.room_no || '-'}</td><td class="py-3 px-4">${escapeHtml(item.home_address || '-')}</td>
                 <td class="py-3 px-4">${item.leave_days}</td><td class="py-3 px-4">${item.school || '-'} / ${item.hostel || '-'}</td>
                 <td class="py-3 px-4">${escapeHtml(item.reason)}</td><td class="py-3 px-4">${escapeHtml(item.status)}</td>
-                <td class="py-3 px-4"><div class="flex flex-wrap gap-2">${['Granted', 'CHECKED_OUT'].includes(item.status) && item.qr_code_data ? `<button type="button" class="bg-blue-600 text-white px-3 py-1 rounded" data-qrcode="${item.id}">View</button>` : ''}${['Pending Verification', 'Granted'].includes(item.status) ? `<button type="button" class="rounded bg-red-600 px-3 py-1 text-white" data-cancel-leave="${item.id}">Cancel</button>` : '-'}</div></td>
+                <td class="py-3 px-4"><div class="flex flex-wrap gap-2">${['Granted', 'CHECKED_OUT'].includes(item.status) && item.qr_code_data ? `<button type="button" class="bg-blue-600 text-white px-3 py-1 rounded" data-qrcode="${item.id}">View</button>` : ''}${['Pending Verification', 'Granted'].includes(item.status) && !item.gate_out_time && leaveStartIsFuture(item) ? `<button type="button" class="rounded bg-red-600 px-3 py-1 text-white" data-cancel-leave="${item.id}">Cancel</button>` : ''}</div></td>
               </tr>`).join('')}</tbody>
           </table>
         </div>
@@ -1893,7 +1898,8 @@ document.addEventListener('DOMContentLoaded', () => {
       table.className = 'min-w-full border border-gray-300 text-sm';
       const columns = [
         ['SAP ID', 'sap_id'], ['Student', 'name'], ['Dates', 'dates'], ['Days', 'leave_days'],
-        ['School / Hostel', 'location'], ['Emergency contact', 'emergency'], ['Reason', 'reason'], ['Approved on', 'granted_at']
+        ['School / Hostel', 'location'], ['Emergency contact', 'emergency'], ['Reason', 'reason'], ['Approved on', 'granted_at'],
+        ['Actions', 'actions']
       ];
       const head = document.createElement('thead');
       head.className = 'bg-gray-100 text-gray-700';
@@ -1924,7 +1930,38 @@ document.addEventListener('DOMContentLoaded', () => {
         columns.forEach(([, key]) => {
           const cell = document.createElement('td');
           cell.className = 'px-3 py-2';
-          cell.textContent = values[key] ?? '-';
+          if (key === 'actions') {
+            if (item.status === 'Granted' && !item.gate_out_time && leaveStartIsFuture(item)) {
+              const cancelButton = document.createElement('button');
+              cancelButton.type = 'button';
+              cancelButton.textContent = 'Cancel';
+              cancelButton.className = 'rounded bg-red-600 px-3 py-1 font-semibold text-white hover:bg-red-700 disabled:opacity-50';
+              cancelButton.addEventListener('click', async () => {
+                if (!window.confirm('Cancel this approved leave before its start date? The gate pass will be invalidated.')) return;
+                cancelButton.disabled = true;
+                try {
+                  const cancelResponse = await fetch('/api/index.php?endpoint=cancel_leave.php', {
+                    method: 'POST',
+                    body: getCsrfFormData({ leave_id: item.id })
+                  });
+                  const cancellation = await cancelResponse.json();
+                  if (!cancelResponse.ok || !cancellation.success) {
+                    throw new Error(cancellation.message || 'Unable to cancel approved leave.');
+                  }
+                  await loadWardenApprovedHistory();
+                } catch (error) {
+                  console.error(error);
+                  window.alert(error.message || 'Unable to cancel approved leave.');
+                  cancelButton.disabled = false;
+                }
+              });
+              cell.appendChild(cancelButton);
+            } else {
+              cell.textContent = '-';
+            }
+          } else {
+            cell.textContent = values[key] ?? '-';
+          }
           row.appendChild(cell);
         });
         body.appendChild(row);
