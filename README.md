@@ -43,14 +43,14 @@ docker compose exec db mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" hostel_leave >
 
 ## Database setup
 
-The project is organized into `frontend/`, `backend/`, and `database/`. Docker initializes the local database from SQL files in `database/` on first boot.
+The project is organized into `frontend/`, `backend/`, and `database/`. Current schemas and bootstrap seeds live in `database/`; upgrade scripts are grouped under `database/migrations/`.
 
 ## Vercel deployment with Supabase
 
 The application supports both local MySQL and Supabase PostgreSQL. Docker keeps using MySQL by default; set `DB_DRIVER=pgsql` on Vercel. Vercel uses the included `vercel.json` and `vercel-php` runtime. All API requests are routed through one `api/index.php` function, and PHP sessions are stored in the database so they work across serverless requests.
 
 1. Create a Supabase project and open **SQL Editor**.
-2. Run `database/supabase_schema.sql`, then run `database/supabase_seed.sql` to create the tables and demo accounts. Do not use the MySQL schema/seed files for Supabase.
+2. Run `database/supabase_schema.sql`, then run `database/supabase_seed.sql` to create the tables and staff bootstrap accounts. Student records are added through the Admin CSV importer. Do not use the MySQL schema/seed files for Supabase.
 3. In the Supabase dashboard, choose **Connect → Transaction pooler**. Copy the host, port, username, and password from the connection details. Supabase recommends this mode for serverless functions; its default port is `6543` and the shared-pooler username is usually `postgres.<project-ref>`.
 4. In Vercel **Project → Settings → Environment Variables**, set these for **Production**:
 
@@ -76,7 +76,7 @@ Do not use the direct database host if it is unreachable from Vercel, and do not
 
 ## Optional portal features
 
-For an existing Supabase deployment, run `database/migration_portal_features_postgres.sql` once in the Supabase SQL Editor before using emergency-contact fields, leave-policy configuration, or announcements. The migration is additive and preserves existing requests. Leave policies are unrestricted until an administrator configures a limit. The migration has a MySQL counterpart for existing local MySQL databases.
+For an existing database, see the migration instructions below before applying an upgrade. Leave policies are unrestricted until an administrator configures a limit.
 
 Students can cancel their own pending or approved leave requests before gate exit. Admins can manage announcements and configure optional hostel policies. Students and wardens can view announcements and a read-only leave calendar. The admin audit-history screen has been removed; internal audit records remain in use by gate and security workflows.
 
@@ -86,20 +86,18 @@ The warden's Approved Leave History section also provides current-week (Monday t
 
 Forgot-password access is available only to students. Admins can reset an active warden account from the Admin Portal; the generated temporary password is displayed once, and the warden must set a new password at the next login. Share temporary passwords securely. This reset feature uses the existing users and audit tables and requires no database migration.
 
-## Demo accounts
+## Staff bootstrap accounts
 
 Choose the matching role on the login screen:
 
 | Role | Login ID | Initial password |
 | --- | --- | --- |
-| Student (Aarav Mehta) | `12345678901` | `Student@1234` |
-| Student (Ira Shah) | `12345678902` | `Student@1234` |
-| Student (Karan Singh) | `12345678903` | `Student@1234` |
-| Student (Meera Joshi) | `12345678904` | `Student@1234` |
-| Boys warden | `warden1` | `Warden@123` |
-| Girls warden | `warden_girls` | `Warden@123` |
-| Admin | `admin` | `Admin@123` |
-| Security | `security` | `Security@123` |
+| Boys warden | `warden1` | `warden@123` |
+| Girls warden | `warden2` | `warden@123` |
+| Admin | `id-admin` | `admin@123` |
+| Security | `security` | `security@123` |
+
+These are initial staff credentials included for setup. Change them before deploying the application for real use. Student accounts are created through student signup after the Admin imports the roster.
 
 ## Leave workflow
 
@@ -111,23 +109,19 @@ The Admin importer updates student records only; it does not create passwords. U
 
 ### Existing database volume
 
-The MySQL entrypoint scripts run only when the database volume is first initialized. To apply the student profile migration to an existing volume, run this once from the project directory:
+The `database/migrations/` folder contains two complete upgrade bundles: one for MySQL and one for PostgreSQL/Supabase. Each bundles schema updates together with legacy account/data changes.
+
+**Important:** each complete bundle also changes staff credentials, maps warden assignments, and may require student password changes and clear sessions. Back up the database first. Do not run a bundle on a database that already has the desired schema/data state. The live Supabase database was previously verified to have the required current schema, so do not rerun this bundle there.
+
+For an older MySQL database that still needs the bundled upgrades, run this once from the project directory:
 
 ```powershell
-Get-Content -Raw .\database\migration_student_profiles_mysql.sql | docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" hostel_leave'
+Get-Content -Raw .\database\migrations\mysql_upgrade.sql | docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" hostel_leave'
 ```
 
-This migration preserves existing requests and adds the new profile and warden-group fields. Existing non-demo student records need their new profile values populated through the updated CSV import before those students can submit requests.
+For an older Supabase database that still needs the bundled upgrades, review the script and run `database/migrations/supabase_upgrade.sql` once in the SQL Editor.
 
-Apply the additive gate attendance migration to an existing MySQL volume:
-
-```powershell
-Get-Content -Raw .\database\migration_gate_attendance_mysql.sql | docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" hostel_leave'
-```
-
-For an existing Supabase database, run `database/migration_gate_attendance_postgres.sql` in the Supabase SQL Editor. New installations receive the gate columns and status values from the corresponding schema file.
-
-The temporary-password importer does not require any Supabase SQL migration or email-provider settings. If you previously ran the student-activation migration, leave its unused email column and token table in place; no rollback is needed.
+Docker runs the MySQL bundle only when a new database volume is initialized. Fresh installations already create current tables from `mysql_schema.sql` or `supabase_schema.sql`; student profiles are populated through the Admin CSV importer. The room number is collected on each leave request, so it is not required in the roster CSV. The importer does not require student email addresses or email-provider settings; any unused old activation tables/columns do not affect temporary-password imports.
 
 ## Production checklist
 
